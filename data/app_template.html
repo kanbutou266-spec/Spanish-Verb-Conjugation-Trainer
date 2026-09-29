@@ -1,0 +1,3286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>西语动词变位练习器</title>
+<style>
+:root{
+  --bg:#f5f6f8; --card:#ffffff; --ink:#1b1d21; --sub:#6b7280; --line:#e4e6eb;
+  --accent:#2f6df6; --accent-soft:#e8f0ff; --ok:#12855a; --ok-soft:#e6f6ef;
+  --bad:#c0392b; --bad-soft:#fdecea; --warn:#b7791f; --warn-soft:#fdf5e3;
+  --tag:#eef1f6; --radius:14px; --shadow:0 1px 3px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.05);
+  /* 变位形式着色：不规则 / 正字法拼写变化 / 词干变化。
+     着色只落在「真正变了的那几个字母」上，只改颜色、不铺底色 */
+  --f-irr:#c0392b; --f-orth:#0b7a7a; --f-stem:#b26a00;
+}
+/* ---- 四个语式分组各自的主题色：陈述=蓝 / 条件=青 / 虚拟=紫 / 命令=橙 ----
+   --g 主色（选中）  --gs 浅底  --gi 深字  --gb 浅边  */
+.g-ind  {--g:#2f6df6;--gs:#e9f1ff;--gi:#1f4fbb;--gb:#bcd0fa}
+.g-cond {--g:#0b7a7a;--gs:#e1f5f5;--gi:#0a6b6b;--gb:#a8dede}
+.g-sub  {--g:#7b45d6;--gs:#f2eaff;--gi:#5f31ad;--gb:#ccb5f0}
+.g-imp  {--g:#b85c07;--gs:#fdf1e2;--gi:#9a4d08;--gb:#efcfa6}
+.c-g{color:var(--g,var(--ink))}
+.c-gi{color:var(--gi,var(--ink))}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink); font-size:16px; line-height:1.55;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:820px;margin:0 auto;padding:22px 18px 80px}
+h1{font-size:24px;margin:0 0 4px;letter-spacing:.2px}
+h2{font-size:16px;margin:26px 0 10px;color:var(--ink);font-weight:650}
+h2:first-child{margin-top:0}
+.sub{color:var(--sub);font-size:13px;margin:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 16px 14px;margin-bottom:14px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.row.tight{gap:6px}
+.spread{display:flex;justify-content:space-between;align-items:center;gap:10px}
+button{font:inherit;color:inherit;cursor:pointer}
+.chip{
+  border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 14px; font-size:14px;
+  transition:.12s; white-space:nowrap; user-select:none;
+}
+.chip:hover{border-color:#c9d3e6;background:#fafbff}
+.chip[aria-pressed="true"]{background:var(--g,var(--accent));border-color:var(--g,var(--accent));color:#fff;font-weight:600}
+.chip.sm{padding:5px 11px;font-size:13px}
+.chip:disabled{opacity:.35;cursor:not-allowed}
+/* 置灰：当前练习模式用不上的选项 —— 保留形状（信息还在），但不给点、去掉悬停高亮 */
+.chip.off,.chip.off:hover,.chip.tint.off,.chip.tint.off:hover{
+  background:#f3f5f9;border-color:#e6eaf2;color:#a8b2c4;font-weight:400;opacity:.85;
+}
+.tgroup.off{opacity:.62}
+.tgroup.off .tgroup-h .n{background:#f3f5f9;color:#a8b2c4}
+.tgroup.off .chips{opacity:.6}
+/* 时态 chip：未选中用所属语式的浅色，选中用其主色 */
+.chip.tint{background:var(--gs);border-color:var(--gb);color:var(--gi)}
+.chip.tint:hover{background:#fff;border-color:var(--g)}
+.chip.tint[aria-pressed="true"]{background:var(--g);border-color:var(--g);color:#fff}
+.btn{
+  border:1px solid var(--line);background:#fff;border-radius:11px;padding:10px 16px;font-size:15px;font-weight:600;
+  transition:.12s;display:inline-flex;align-items:center;gap:6px;justify-content:center;
+}
+.btn:hover{border-color:#c9d3e6;background:#fafbff}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;padding:11px 22px}
+.btn.primary:hover{background:#255ee0}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--sub);font-weight:500}
+.btn.ghost:hover{background:#eceff4;color:var(--ink)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.wide{width:100%}
+.tag{display:inline-block;background:var(--tag);color:#495057;border-radius:6px;padding:1px 7px;font-size:12px;margin:0 4px 4px 0}
+.tag.acc{background:var(--accent-soft);color:#1f4fbb}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.tag.bad{background:var(--bad-soft);color:var(--bad)}
+.field{margin:10px 0 0}
+.fh{font-size:12px;color:var(--sub);margin-bottom:5px;letter-spacing:.3px}
+.fh .note{color:var(--accent);font-weight:600;margin-left:6px}
+.hint{font-size:13px;color:var(--sub);line-height:1.6}
+.verb-big{font-size:34px;font-weight:700;letter-spacing:.5px;line-height:1.25;word-break:break-word}
+.verb-mid{font-size:22px;font-weight:650}
+/* 题干里的原形行：显示原形 与「隐藏成一个按钮」两种状态共用一层固定高度的壳。
+   隐藏态整行就是那个按钮本身（原来的 ? ? ? 占位已去掉），
+   两种状态的内容都矮于 35px，所以点「看原形」前后题干高度严格不变，
+   下面的选项网格不会上下跳。 */
+.inf-line{display:flex;align-items:center;justify-content:center;min-height:35px}
+.inf-mask{display:flex;align-items:center;justify-content:center}
+/* 「看原形」按正常按钮的样子画：淡蓝底 + 描边 + accent 文字。
+   高度 = 14×1.4 + 5×2 + 1×2 ≈ 31.6px，必须留在 min-height:35px 以内，
+   否则壳会被撑高、揭示原形后反而变矮，就又跳动了 */
+.inf-mask .btn.peek{
+  padding:5px 15px;font-size:14px;line-height:1.4;border-radius:10px;
+  font-weight:600;color:var(--accent);border-color:#c3d4fb;background:var(--accent-soft);
+}
+.inf-mask .btn.peek:hover{background:#dce7fd;border-color:#a9c2f7}
+.zh{color:var(--sub);font-size:15px}
+/* 题干下的中文释义行：无论开关都占住同一行高度（关掉时只是隐形），
+   切换开关时下方的人称/选项网格不会移动 */
+.zh-line{min-height:24px}
+.zh.off{visibility:hidden}
+.pill{background:var(--accent-soft);color:#1f4fbb;border-radius:8px;padding:3px 10px;font-size:13px;font-weight:600}
+.pill.grey{background:#eef1f6;color:#4b5563}
+.pill.dark{background:#1b1d21;color:#fff}
+/* 时态 pill 也按语式着色 */
+.pill.g-ind,.pill.g-cond,.pill.g-sub,.pill.g-imp{background:var(--gs);color:var(--gi)}
+.qbox{border:1px dashed #cfd6e4;border-radius:12px;padding:16px;background:#fbfcfe;text-align:center}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+.opts.three{grid-template-columns:1fr 1fr 1fr}
+/* 人称选项：第一行单数（yo/tú/él），第二行复数（nosotros/vosotros/ellos） */
+.opts.persons{display:flex;flex-direction:column;gap:8px}
+.opts.persons .orow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.opts.persons .opt{padding:11px 8px;font-size:15px;line-height:1.3}
+.opts.persons .opt .pol{display:block}
+.opts.persons .opt .pol .s{display:none}
+.opts.persons .opt small{margin-top:3px}
+/* 人称 × 形式小网格（答案对照 / 变位表）：同样第一行单数、第二行复数 */
+.pgrid{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+.pgrid .prow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.pgrid .pcell{border:1px solid var(--line);border-radius:9px;padding:4px 9px;background:#fff;min-width:0}
+.pgrid .pcell .pl{display:block;font-size:10.5px;color:var(--sub);line-height:1.35}
+/* 形式：只在空格处断行（两个词可以分开），绝不从单词中间裂开；
+   偏长的形式（多是复合时态）由 JS 按字数降一档字号并收窄内边距，保证放得下 */
+.pgrid .pcell b{font-weight:650;font-size:15px;line-height:1.3;word-break:normal;overflow-wrap:normal;hyphens:none}
+.pgrid .pcell.lg{padding-left:4px;padding-right:4px}
+.pgrid .pcell b.sm{font-size:12.5px;letter-spacing:-.2px}
+.pgrid .pcell b.xs{font-size:11.5px;letter-spacing:-.3px}
+/* 变位形式按「不规则类型」着色：不规则=红 / 正字法拼写=青 / 词干变化=橙。
+   只染真正变了的那几个字母（<i class="hl">），其余字母保持常规字色：
+   poder→p[ue]do 只标 ue、tocar→to[qu]é 只标 qu、actuar→act[ú]o 只标 ú。
+   两条硬规则：
+   ① 只改文字颜色，不加底色（底色会喧宾夺主，也让整格视觉变重）；
+   ② 字号 / 字重 / 字距 / 内边距全部 inherit 或清零 —— 只要其中之一与相邻字母不同，
+      这个字母的占宽就会变，整词的字距就会忽宽忽窄。 */
+.pgrid .pcell b .hl{
+  font-style:normal;font-weight:inherit;font-size:inherit;letter-spacing:inherit;
+  background:none;padding:0;border-radius:0;
+}
+.pgrid .pcell b.w-i .hl{color:var(--f-irr)}
+.pgrid .pcell b.w-o .hl{color:var(--f-orth)}
+.pgrid .pcell b.w-s .hl{color:var(--f-stem)}
+.pgrid .pcell.hi{background:var(--accent-soft);border-color:#bcd0fa}
+.pgrid .pcell.empty{opacity:.45}
+.opt{
+  border:1px solid var(--line);background:#fff;border-radius:12px;padding:13px 10px;font-size:16px;font-weight:600;
+  transition:.12s;text-align:center;
+}
+.opt:hover{border-color:#c9d3e6;background:#fafbff}
+.opt.sel{background:var(--accent);border-color:var(--accent);color:#fff}
+.opt.rev-ok{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.opt.rev-bad{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.chip.rev-ok,.chip.tint.rev-ok{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.chip.rev-bad,.chip.tint.rev-bad{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.opt small{display:block;font-weight:400;font-size:12px;opacity:.7;margin-top:2px}
+input[type=text]{
+  width:100%;font:inherit;font-size:20px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;
+  background:#fff;outline:none;transition:.12s;
+}
+input[type=text]:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.fb{margin-top:14px;border-radius:12px;padding:14px;font-size:15px;border:1px solid}
+.fb.ok{background:var(--ok-soft);border-color:#bfe3d3}
+.fb.bad{background:var(--bad-soft);border-color:#f3cdc7}
+.fb.warn{background:var(--warn-soft);border-color:#f0e0b8}
+.fb .head{font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px}
+.fb .head .mark{font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+th{color:var(--sub);font-weight:600;font-size:12.5px;text-align:left}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.hi td{background:var(--accent-soft);font-weight:700}
+.tense-tbl td:first-child{color:var(--sub);font-size:13px;white-space:nowrap}
+.bar{height:6px;border-radius:4px;background:#eceff4;overflow:hidden;min-width:60px}
+.bar>i{display:block;height:100%;background:var(--bad)}
+.mono{font-variant-numeric:tabular-nums}
+.center{text-align:center}
+.hidden{display:none!important}
+.nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.meta{font-size:13px;color:var(--sub)}
+.stat-big{font-size:28px;font-weight:700;line-height:1.1}
+.stat-lbl{font-size:12px;color:var(--sub)}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media (max-width:560px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .opts{grid-template-columns:1fr}
+  .opts.three{grid-template-columns:1fr 1fr}
+  .opts.persons .opt{padding:9px 5px;font-size:13.5px}
+  .opts.persons .opt .pol{font-size:12.5px;line-height:1.3}
+  .opts.persons .opt .pol .w{display:none}
+  .opts.persons .opt .pol .s{display:inline}
+  .pgrid .pcell{padding:4px 6px}
+  .pgrid .pcell b{font-size:13.5px}
+  .verb-big{font-size:28px}
+  .wrap{padding:16px 13px 70px}
+}
+kbd{background:#eef1f6;border-radius:5px;padding:1px 5px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace}
+/* 主页：变位规则速览入口 */
+.gcard .growbox{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+/* 变位规则讲解页 */
+.gd h3{font-size:15px;margin:18px 0 6px;color:var(--ink)}
+.gd h3:first-child{margin-top:0}
+.gd p{margin:7px 0;font-size:14.5px;line-height:1.72}
+.gd ul{margin:7px 0 7px 18px;padding:0;font-size:14.5px;line-height:1.72}
+.gd li{margin:3px 0}
+.gd code,.gd .es{font-family:inherit;background:#f1f4f9;border-radius:5px;padding:1px 6px;font-size:13.5px}
+.gd .es{color:#334155}
+.gd table{margin:10px 0;font-size:14px}
+.gd th,.gd td{border-bottom:1px solid var(--line);padding:5px 8px}
+.gd tr.hi td{background:var(--accent-soft);font-weight:700}
+.gd .tip{border-left:3px solid var(--warn);background:var(--warn-soft);border-radius:0 10px 10px 0;padding:8px 12px;margin:10px 0;font-size:14px}
+.gd .tip.ok{border-color:var(--ok);background:var(--ok-soft)}
+.gd .tip.warnx{border-color:var(--bad);background:var(--bad-soft)}
+/* 讲解页里的变位网格：正文里的 {{G:动词,动词|时态键}} 展开而成，
+   用的就是练习模式展示正确答案的那套渲染器（含「只染变化的字母」）。
+   注意：这里不再给 .gd .w-* 单独设整词颜色——整词染色会覆盖掉全局的
+   .pgrid .pcell b.w-* .hl 规则（那只染变化的 stem），导致讲解页「整词都染」
+   而词汇表「只染 stem」不一致。整词颜色删掉后，讲解页与词汇表完全一致。 */
+/* 排版：guideGrid 已按每行 ≤2 个动词分行，一行一个 .gexrow（flex）。
+   一行两个 → 两格平分整行宽（长形式不再溢出）；一行只剩一个 → 定宽（半行）
+   居中，不拉伸占满整行。别改回固定 246px——长形式会溢出（用户明确反馈过）。 */
+.gexrow{display:flex;justify-content:center;gap:14px;margin:11px 0 14px}
+.gex{border:1px solid var(--line);border-radius:12px;background:#fbfcfe;padding:9px 10px 11px;flex:1 1 0;min-width:0}
+.gex:only-child{flex:0 0 auto;width:calc(50% - 7px)}
+.gex-h{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.gex-h .vb{font-size:16.5px;font-weight:700;letter-spacing:.2px}
+.gex-h .zh{font-size:12.5px}
+.gex .pgrid{margin-top:7px}
+.gex .pgrid .pcell{background:#fff}
+@media (max-width:520px){.gexrow{flex-wrap:wrap;gap:11px}.gexrow .gex,.gexrow .gex:only-child{flex:1 1 100%;width:auto}}
+.gd .links{margin:14px 0 0}
+.gd .links a{display:block;border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:7px;text-decoration:none;color:var(--ink);background:#fbfcfe;transition:.12s}
+.gd .links a:hover{border-color:#c9d3e6;background:#f8faff}
+.gd .links a b{font-weight:650}
+.gd .links a span{display:block;color:var(--sub);font-size:12.5px;line-height:1.5}
+.gd .links a em{color:var(--accent);font-style:normal;font-size:12px;word-break:break-all}
+/* 图例 */
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:9px;font-size:12.5px;color:var(--sub)}
+.legend .k{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px}
+.legend-note{font-size:12px;color:var(--sub);margin-top:5px;line-height:1.5}
+/* 反馈里的「相关语法」链接 */
+.glinks{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.glinks .lb{font-size:13px;color:var(--sub)}
+.glinks button,.glinks a{border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 11px;font-size:12.5px;color:var(--accent);font-weight:600;text-decoration:none;cursor:pointer}
+.glinks button:hover,.glinks a:hover{border-color:var(--accent);background:var(--accent-soft)}
+/* 变位表页脚：RAE 官方变位 + 规则页入口 */
+.tfoot{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;font-size:13px}
+.tfoot a{color:var(--accent);text-decoration:none;border-bottom:1px solid #c9d9fb}
+.tfoot button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 11px;font-size:12.5px;color:var(--accent);font-weight:600;cursor:pointer}
+.tfoot button:hover{border-color:var(--accent);background:var(--accent-soft)}
+/* 时态分组：2×2 语式网格 —— 第一行 陈述式 + 条件式，第二行 虚拟式 + 命令式。
+   列宽按「两组各自的最小需要」折中：
+     左列要装下陈述式的 4 个简单时态（中文 365px / 英文 372px）与组名（Indicative）；
+     右列要装下组名 + 计数 + 全选/清空 一行不换行（中文 228px / 英文 255px）。
+   1.375 : 1 在 750px 容器里给两边各留约 30px 余量，中英文都不会折行。
+   注意：容器（.wrap max-width:820px 去内边距）最宽只有 750px，所以两列合起来必须
+   装得下，窗口再窄就整格退化成单列（见下方 780px 断点）。 */
+.tgs{display:grid;grid-template-columns:minmax(0,1.375fr) minmax(0,1fr);gap:9px;margin-top:9px}
+.tgroup{border:1px solid var(--line);border-left:4px solid var(--g,var(--line));border-radius:12px;padding:9px 11px 10px;background:#fcfdff;min-width:0}
+.tgroup-h{display:flex;align-items:center;gap:6px;margin-bottom:7px;flex-wrap:wrap}
+.tgroup-h .nm{font-size:13.5px;font-weight:700;letter-spacing:.2px;color:var(--gi,var(--ink))}
+.tgroup-h .es{font-size:11.5px;color:var(--sub)}
+.tgroup-h .es.hs{opacity:.75}
+.tgroup-h .n{font-size:11.5px;color:var(--sub);background:var(--tag);border-radius:999px;padding:1px 7px;font-variant-numeric:tabular-nums}
+.tgroup-h .n.full{background:var(--gs,var(--accent-soft));color:var(--gi,#1f4fbb);font-weight:600}
+.tgroup-h .act{margin-left:auto;display:flex;gap:2px;align-items:center}
+.tgroup-h .act button{
+  border:1px solid transparent;background:transparent;color:var(--sub);font-size:11.5px;padding:2px 6px;border-radius:7px;
+}
+.tgroup-h .act button:hover{background:#eceff4;color:var(--ink);border-color:var(--line)}
+/* 组内两层：上层简单时态 / 下层复合时态（比左右两列更省横向空间） */
+.trow{display:flex;gap:7px;align-items:flex-start}
+.trow+.trow{margin-top:6px}
+.trow .th{flex:none;min-width:26px;font-size:10.5px;color:var(--sub);letter-spacing:.3px;padding-top:5px;text-align:right}
+.trow .chips{display:flex;flex-wrap:wrap;gap:5px;min-width:0}
+.trow .none{font-size:12px;color:var(--sub);opacity:.5;line-height:1.9}
+/* 简单 / 复合 两列（左简单 右复合），所有分组共用同一套列宽以对齐 */
+.tgrid{display:grid;grid-template-columns:1fr 1fr;gap:0;align-items:start}
+.tgrid .tcol{min-width:0;padding-right:12px}
+.tgrid .tcol.cmp{padding-right:0;padding-left:14px;border-left:1px solid var(--line)}
+/* 保留一列时（辨认模式只出同类时态），顶部已注明类型，列标题不再重复 */
+.tgrid.one{grid-template-columns:1fr}
+.tgrid.one .tcol{padding-right:0}
+.tgrid.one .tcol.cmp{padding-left:0;border-left:0;padding-top:0;margin-top:0}
+.tgrid.one .tcol-h{display:none}
+.tcol-h{font-size:11.5px;color:var(--sub);letter-spacing:.4px;margin-bottom:6px}
+.tcol-h.empty{opacity:.45}
+.tcol .chips{display:flex;flex-wrap:wrap;gap:6px}
+.tcol .none{font-size:12px;color:var(--sub);opacity:.5;line-height:1.9}
+.tgroup .tgrid{margin-top:1px}
+/* 时态卡片内的小标题（变位表） */
+.tg-block{margin-bottom:11px}
+/* 两列合起来（最宽的中文 656px / 英文 690px）装不下时整格退成单列，
+   避免右列的「组名 + 计数 + 全选/清空」被挤到第二行 —— 低于 780px 窗口即单列 */
+@media (max-width:780px){
+  .tgs{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  .tgrid{grid-template-columns:1fr}
+  .tgrid .tcol{padding-right:0}
+  .tgrid .tcol.cmp{padding-left:0;border-left:0;border-top:1px dashed var(--line);padding-top:9px;margin-top:9px}
+}
+/* 辨认模式：时态选项框 */
+.tpick{margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:10px 12px 12px;background:#fbfcfe;text-align:left}
+.tpick-g .tgrid .tcol{padding-right:10px}
+.tpick-g .tgrid .tcol.cmp{padding-left:12px}
+.tpick-h{font-size:12.5px;font-weight:700;margin-bottom:6px;color:var(--gi,var(--ink))}
+.tpick-h .es{font-weight:400;font-size:11.5px;color:var(--sub);margin-left:5px}
+.tpick-g{border-left:3px solid var(--g,transparent);padding-left:9px}
+/* 一行放两个语式组：陈述式+条件式 / 虚拟式+命令式 */
+.tpick-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.tpick-row+.tpick-row{margin-top:9px}
+@media (max-width:560px){.tpick-row{grid-template-columns:minmax(0,1fr)}}
+/* 变位表：分组卡片也带主题色 */
+.tcard{border-left:4px solid var(--g,var(--line))}
+.tcard>h2{color:var(--gi,var(--ink));font-size:15px}
+
+/* ============================================================
+   右栏：变位表（查询模式，可拉开 / 收回的抽屉）
+   抽屉一律以浮层出现，压在正文之上：开合只动抽屉本身，
+   正文的宽度、位置、滚动条都不变（不会抖一下）。
+   ============================================================ */
+:root{--dw-w:480px}
+@media (max-width:1020px){:root{--dw-w:min(520px,94vw)}}
+/* 收起时的拉手：贴在右边缘中部，做成一眼就能看见的常驻按钮 */
+.dwtab{
+  position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:40;
+  display:flex;flex-direction:column;align-items:center;gap:9px;
+  border:0;border-radius:16px 0 0 16px;cursor:pointer;
+  background:linear-gradient(180deg,#5a92ff,var(--accent) 58%,#2050cd);
+  color:#fff;padding:16px 10px;
+  box-shadow:0 8px 26px rgba(47,109,246,.45);
+  animation:dwPulse 2.6s ease-in-out infinite;
+}
+.dwtab .ico{font-size:17px;line-height:1}
+.dwtab .lb{writing-mode:vertical-rl;letter-spacing:4px;font-size:13.5px;font-weight:700;line-height:1.1}
+.dwtab:hover{padding-right:15px;background:linear-gradient(180deg,#6b9cff,#3c7bff 58%,#2a5fe0)}
+.dwtab:active{transform:translateY(-50%) scale(.98)}
+.dwtab:focus-visible{outline:3px solid #9dbcff;outline-offset:2px}
+@keyframes dwPulse{
+  0%,100%{box-shadow:0 8px 26px rgba(47,109,246,.45),0 0 0 0 rgba(47,109,246,.55)}
+  60%    {box-shadow:0 8px 26px rgba(47,109,246,.45),0 0 0 11px rgba(47,109,246,0)}
+}
+@media (prefers-reduced-motion:reduce){.dwtab{animation:none}}
+/* 正文开始铺满整个宽度的档位起，右边中部就容易压住文字，改挂到底部（也更好按） */
+@media (max-width:900px){
+  .dwtab{top:auto;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:none;padding:13px 10px}
+  .dwtab:active{transform:scale(.97)}
+}
+/* 抽屉打开时拉手让位给抽屉里的关闭按钮 */
+body.dw-open .dwtab{display:none}
+.dw-scrim{
+  position:fixed;inset:0;background:rgba(18,26,48,.44);z-index:58;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+body.dw-open .dw-scrim{opacity:1;pointer-events:auto}
+.drawer{
+  position:fixed;top:0;right:0;bottom:0;width:var(--dw-w);z-index:60;
+  display:flex;flex-direction:column;background:var(--card);
+  border-left:1px solid var(--line);box-shadow:-12px 0 36px rgba(16,24,40,.22);
+  transform:translateX(103%);transition:transform .22s ease;
+}
+body.dw-open .drawer{transform:none}
+.dw-head{display:flex;align-items:center;gap:8px;padding:11px 12px 10px 14px;border-bottom:1px solid var(--line)}
+.dw-head .ttl{font-size:15px;font-weight:700}
+.dw-head .cnt{margin-left:auto;font-size:12px;color:var(--sub)}
+.dw-x{border:0;background:transparent;font-size:15px;line-height:1;color:var(--sub);padding:6px 9px;border-radius:9px}
+.dw-x:hover{background:#eceff4;color:var(--ink)}
+.dw-search{position:relative;padding:10px 12px 8px}
+#dw-q{font-size:15px;padding:9px 12px}
+.dw-sug{
+  position:absolute;left:12px;right:12px;top:calc(100% - 3px);z-index:5;
+  background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+  max-height:62vh;overflow-y:auto;padding:4px;
+}
+.dw-sug button{
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:7px;width:100%;text-align:left;
+  border:0;background:transparent;padding:7px 9px;border-radius:9px;font-size:14px;
+}
+.dw-sug button .iv{font-weight:650}
+.dw-sug button .iz{color:var(--sub);font-size:12.5px}
+.dw-sug button .ih{margin-left:auto;color:var(--sub);font-size:12px;font-style:italic}
+.dw-sug button:hover,.dw-sug button.cur{background:var(--accent-soft)}
+.dw-sug .none{font-size:12.5px;color:var(--sub);padding:6px 10px 8px}
+.dw-body{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:2px 12px 26px}
+/* 抽屉里动词头 + 变位表 */
+.dwh{display:flex;align-items:flex-end;gap:9px;flex-wrap:wrap;margin:6px 0 0}
+.dwh .vb{font-size:26px;font-weight:700;letter-spacing:.3px;line-height:1.2}
+.dwh .lv{margin-left:auto}
+.dwz{font-size:13.5px;color:var(--sub);margin-top:1px}
+.dwtag{margin-top:7px}
+.dwg{margin-top:12px}
+.tcard.dwg{padding:9px 10px 10px}
+.dwg>.dwg-h{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;font-size:14px;margin:0 0 6px}
+.dwg>.dwg-h .es{font-size:11px;font-weight:400;color:var(--sub)}
+.dwg>.dwg-h .cnt{margin-left:auto;font-size:11px;font-weight:400;color:var(--sub)}
+.dwg-cap{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 2px;font-size:11px;letter-spacing:.4px;color:var(--sub)}
+.dwp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:7px}
+.dwb{min-width:0;border:1px solid var(--line);border-radius:11px;padding:6px 7px 5px;background:#fff}
+.dwb-h{font-size:11.5px;font-weight:700;color:var(--gi,var(--ink));line-height:1.35;margin-bottom:3px}
+.dwb-h .es{display:block;font-weight:400;font-size:10px;color:var(--sub);letter-spacing:0}
+.dwb.none{border-style:dashed;background:#fafbfd}
+.dwb-none{font-size:11px;color:var(--sub);line-height:1.6;opacity:.85}
+.dwb.hi{border-color:var(--gb,var(--accent));background:var(--gs,var(--accent-soft))}
+.drawer .tg-block{margin-bottom:0}
+/* 抽屉里人称排成 6 行 1 列（窄栏里这样最清楚）：沿用 .pgrid/.pcell 结构，只改排列 */
+.drawer .pgrid{gap:0;margin-top:1px}
+.drawer .prow{display:block}
+.drawer .pcell{display:flex;align-items:baseline;gap:7px;border:0;background:transparent;border-radius:6px;padding:1px 3px}
+.drawer .pcell .pl{flex:none;width:50px;font-size:10px;text-align:right;line-height:1.6}
+.drawer .pcell b{flex:1;min-width:0;font-size:13.5px;line-height:1.5}
+.drawer .pcell b.sm{font-size:12px}
+.drawer .pcell b.xs{font-size:11px}
+.drawer .pcell.hi{background:var(--accent-soft)}
+.drawer .pcell.hi b{font-weight:800}
+/* 平移模式：A 动词（已知）→ B 动词（待变位）对照框 */
+.xfer{margin:11px auto 0;max-width:480px;border:1px dashed #cfd6e4;border-radius:11px;overflow:hidden;text-align:left}
+.xrow{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:9px;align-items:center;padding:9px 12px}
+.xrow+.xrow{border-top:1px dashed var(--line);background:#fff}
+.xlab{width:22px;height:22px;border-radius:50%;background:var(--tag);color:#4b5563;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.xverb b{font-size:19px;font-weight:650}
+.xverb .zh{display:block;font-size:12.5px;line-height:1.3}
+.xform{font-size:19px;font-weight:650;text-align:right}
+.xrow.b .xform{color:#b9c2d4;letter-spacing:2px}
+.footer{margin-top:30px;font-size:12px;color:var(--sub);text-align:center;line-height:1.7}
+select{font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:#fff;max-width:100%}
+/* 顶部语言切换（页面最上方，四个界面都常驻） */
+.topbar{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:10px}
+.langsw{display:inline-flex;border:1px solid var(--line);border-radius:999px;background:#fff;overflow:hidden;box-shadow:var(--shadow)}
+.langsw button{border:0;background:transparent;padding:5px 14px;font-size:12.5px;color:var(--sub);transition:.12s}
+.langsw button:hover{background:#f2f5fa;color:var(--ink)}
+.langsw button[aria-pressed="true"]{background:var(--accent);color:#fff;font-weight:600}
+/* 练习模式标题行 + 设置按钮 */
+.h2row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.h2row .setbtn{margin-left:auto}
+.setpanel{margin-top:9px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:12px;padding:10px 12px 12px;background:#fbfcfe}
+.setpanel .sh{font-size:12.5px;font-weight:700;color:var(--ink)}
+.setpanel .hint{margin:8px 0 0}
+/* 主语提示紧挨在输入框左侧（只给西语代词，不再附中文 / 英语注解） */
+.ansrow{display:flex;align-items:center;gap:9px}
+.ansrow .subj{flex:none;display:inline-flex;align-items:baseline;white-space:nowrap;font-size:15px}
+.ansrow input[type=text]{flex:1;min-width:0}
+@media (max-width:560px){
+  .ansrow{gap:7px}
+  .ansrow .subj{font-size:13.5px;padding:7px 9px}
+}
+</style>
+</head>
+<body id="app-body">
+<div class="wrap">
+
+<!-- 顶部：语言切换（中 / 英） -->
+<div class="topbar">
+  <div class="langsw" id="g-lang" role="group" aria-label="Language"></div>
+</div>
+
+<!-- ============================ 主页 ============================ -->
+<section id="scr-menu">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
+    <div>
+      <h1 id="g-title"></h1>
+      <p class="sub" id="g-sub"></p>
+    </div>
+    <button class="btn ghost" id="m-stats-btn"></button>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h2 id="h-scope"></h2>
+    <div class="row" id="m-levels"></div>
+    <div class="row" id="m-tags" style="margin-top:8px"></div>
+    <p class="hint" id="m-level-hint" style="margin:8px 0 0"></p>
+    <p class="hint" id="m-lv-tense-hint" style="margin:4px 0 0;opacity:.85"></p>
+
+    <h2 class="h2row"><span id="h-mode"></span>
+      <button class="btn ghost sm setbtn" id="m-set" aria-expanded="false"></button></h2>
+    <div class="row" id="m-modes"></div>
+    <p class="hint" id="m-mode-rule" style="margin:8px 0 0"></p>
+    <div class="setpanel hidden" id="m-opt-panel">
+      <div class="sh" id="m-opt-sh"></div>
+      <div class="row" id="m-opts"></div>
+      <p class="hint" id="m-opt-hint" style="margin:8px 0 0"></p>
+    </div>
+
+    <h2 id="h-tense"></h2>
+    <div id="m-tenses"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn ghost sm" id="m-t-all"></button>
+      <button class="btn ghost sm" id="m-t-none"></button>
+    </div>
+    <div class="row" id="m-t-recs" style="margin-top:8px"></div>
+    <div class="row" style="margin-top:6px">
+      <span class="meta" id="m-t-count"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="spread">
+      <div>
+        <div class="meta" id="m-pool"></div>
+      </div>
+      <button class="btn primary" id="m-start"></button>
+    </div>
+    <p class="hint" id="m-keys" style="margin:10px 0 0"></p>
+  </div>
+
+  <div class="card gcard">
+    <div class="spread">
+      <h2 style="margin:0" id="h-guide"></h2>
+      <button class="btn ghost" id="m-guide-open"></button>
+    </div>
+    <p class="hint" id="m-guide-hint" style="margin:8px 0 0"></p>
+    <div class="growbox" id="m-guide"></div>
+  </div>
+
+  <div class="footer" id="g-footer"></div>
+</section>
+
+<!-- ============================ 练习页 ============================ -->
+<section id="scr-practice" class="hidden">
+  <div class="nav">
+    <div class="row tight">
+      <button class="btn ghost" id="p-exit"></button>
+      <button class="btn ghost" id="p-prev"></button>
+    </div>
+    <div class="row tight">
+      <span class="meta" id="p-progress"></span>
+      <button class="btn ghost" id="p-table"></button>
+      <button class="btn ghost" id="p-zh"></button>
+    </div>
+  </div>
+  <div id="p-body"></div>
+</section>
+
+<!-- ============================ 统计页 ============================ -->
+<section id="scr-stats" class="hidden">
+  <div class="nav">
+    <button class="btn ghost" id="s-back"></button>
+    <span class="meta" id="s-nav"></span>
+  </div>
+  <div id="s-body"></div>
+</section>
+
+<!-- ============================ 变位规则讲解 ============================ -->
+<section id="scr-guide" class="hidden">
+  <div class="nav">
+    <button class="btn ghost" id="gd-back"></button>
+    <div class="row tight">
+      <button class="btn ghost sm" id="gd-prev"></button>
+      <button class="btn ghost sm" id="gd-next"></button>
+    </div>
+  </div>
+  <div id="gd-body"></div>
+</section>
+
+</div>
+
+<!-- ============================ 右栏：变位表（查询模式） ============================ -->
+<button type="button" class="dwtab" id="dw-tab" aria-controls="dw" aria-expanded="false">
+  <span class="ico" aria-hidden="true">▤</span><span class="lb" id="dw-tab-lb"></span>
+</button>
+<div class="dw-scrim" id="dw-scrim"></div>
+<aside class="drawer" id="dw" aria-hidden="true">
+  <div class="dw-head">
+    <span class="ttl" id="dw-ttl"></span>
+    <span class="cnt" id="dw-cnt"></span>
+    <button type="button" class="dw-x" id="dw-close" aria-label="close">✕</button>
+  </div>
+  <div class="dw-search">
+    <input type="text" id="dw-q" autocomplete="off" autocapitalize="off" spellcheck="false"
+           role="combobox" aria-expanded="false" aria-autocomplete="list">
+    <div class="dw-sug hidden" id="dw-sug"></div>
+  </div>
+  <div class="dw-body" id="t-body"></div>
+</aside>
+
+<script>
+/* ============================================================
+   数据（由 build_final.py 注入）
+   ============================================================ */
+const RAW = __VERB_DATA__;
+const VERBS = RAW.v;
+const byInf = {}; VERBS.forEach(v => byInf[v.i] = v);
+
+/* ---------------- 元数据 ---------------- */
+/* g = 分组：ind 陈述式 / cond 条件式 / sub 虚拟式 / imp 命令式
+   cp = 1 表示复合时态（haber + 过去分词），0 表示简单时态
+   es = 西班牙语原名（两种界面语言下都显示）；zh / en = 界面语言下的名称 */
+const TENSES = [
+  {k:'p',  zh:'现在时',              en:'Present',                     es:'Presente',                    g:'ind', cp:0, lv:'A1'},
+  {k:'pr', zh:'简单过去时',          en:'Preterite',                   es:'Pretérito indefinido',        g:'ind', cp:0, lv:'A2'},
+  {k:'i',  zh:'过去未完成时',        en:'Imperfect',                   es:'Imperfecto',                  g:'ind', cp:0, lv:'A2'},
+  {k:'f',  zh:'将来时',              en:'Future',                      es:'Futuro simple',               g:'ind', cp:0, lv:'B1'},
+  {k:'pp', zh:'现在完成时',          en:'Present perfect',             es:'Pretérito perfecto',          g:'ind', cp:1, lv:'A1'},
+  {k:'pq', zh:'过去完成时',          en:'Pluperfect',                  es:'Pluscuamperfecto',            g:'ind', cp:1, lv:'B1'},
+  {k:'fp', zh:'将来完成时',          en:'Future perfect',              es:'Futuro compuesto',            g:'ind', cp:1, lv:'B2'},
+  {k:'c',  zh:'条件式',              en:'Conditional',                 es:'Condicional simple',          g:'cond',cp:0, lv:'B1'},
+  {k:'cp', zh:'条件完成时',          en:'Conditional perfect',         es:'Condicional compuesto',       g:'cond',cp:1, lv:'B2'},
+  {k:'sp', zh:'虚拟式现在时',        en:'Present subjunctive',         es:'Subjuntivo presente',         g:'sub', cp:0, lv:'B1'},
+  {k:'si', zh:'虚拟式过去未完成时',  en:'Imperfect subjunctive',       es:'Subjuntivo imperfecto',       g:'sub', cp:0, lv:'B2'},
+  {k:'spt',zh:'虚拟式现在完成时',    en:'Present perfect subjunctive', es:'Subjuntivo perfecto',         g:'sub', cp:1, lv:'B2'},
+  {k:'sq', zh:'虚拟式过去完成时',    en:'Pluperfect subjunctive',      es:'Subjuntivo pluscuamperfecto', g:'sub', cp:1, lv:'B2'},
+  {k:'ia', zh:'肯定命令式',          en:'Affirmative imperative',      es:'Imperativo afirmativo',       g:'imp', cp:0, lv:'B2'},
+  {k:'in', zh:'否定命令式',          en:'Negative imperative',         es:'Imperativo negativo',         g:'imp', cp:0, lv:'B2'},
+];
+const TENSE_GROUPS = [
+  {k:'ind',  zh:'陈述式', en:'Indicative',  es:'Indicativo',  hint:'叙述事实',        ehint:'states facts'},
+  {k:'cond', zh:'条件式', en:'Conditional', es:'Condicional', hint:'假设、礼貌',      ehint:'hypothetical, polite'},
+  {k:'sub',  zh:'虚拟式', en:'Subjunctive', es:'Subjuntivo',  hint:'主观、愿望、从句', ehint:'wishes, subordinate clauses'},
+  {k:'imp',  zh:'命令式', en:'Imperative',  es:'Imperativo',  hint:'下达命令',        ehint:'commands'},
+];
+const ALL_TENSE_KEYS = TENSES.map(t => t.k);
+const GZH = {}; TENSE_GROUPS.forEach(g => GZH[g.k] = g.zh);
+const T = {}; TENSES.forEach(t => T[t.k] = t);
+const G = {}; TENSE_GROUPS.forEach(g => G[g.k] = g);
+/* 词表难度等级（与 build_final.py 的 LEVELS 保持一致）。
+   curate.txt 里写了别的值 → 数据里有、但这里筛不到，等于静默消失。 */
+const LEVELS = ['A1','A2','B1','B2','C1','C2'];
+/* 取某分组下的简单 / 复合时态 */
+const tensesOf = (g, cp, has) =>
+  TENSES.filter(t => t.g === g && !!t.cp === !!cp && (!has || has(t.k)));
+/* 「按难度推荐时态」用的参考时态集（顺序与 TENSES 一致，便于阅读）。
+   只到 B2：B2 已经是全部 15 个时态，C1/C2 再列一遍没有意义，
+   所以推荐行保持 A1~B2 四档，等级筛选行才是六档。 */
+const LV_TENSE = {
+  A1: ['p','pp'],
+  A2: ['p','pr','i','pp'],
+  B1: ['p','pr','i','f','pp','pq','c','sp'],
+  B2: ALL_TENSE_KEYS.slice()
+};
+const TENSE_RECS = ['A1','A2','B1','B2'];
+const PERSONS = [
+  {l:'yo',                    sl:'yo',           S:'yo',                      pro:['yo'],                     gl:'我',            E:'I'},
+  {l:'tú',                    sl:'tú',           S:'tú',                      pro:['tú'],                     gl:'你',            E:'you (informal)'},
+  {l:'él / ella / usted',     sl:'él / ella',    S:'él / ella / usted',       pro:['él','ella','usted'],       gl:'他/她/您',      E:'he / she / you (polite)'},
+  {l:'nosotros / nosotras',   sl:'nosotros',     S:'nosotros / nosotras',     pro:['nosotros','nosotras'],     gl:'我们',          E:'we'},
+  {l:'vosotros / vosotras',   sl:'vosotros',     S:'vosotros / vosotras',     pro:['vosotros','vosotras'],     gl:'你们',          E:'you all (Spain)'},
+  {l:'ellos / ellas / ustedes',sl:'ellos / ellas',S:'ellos / ellas / ustedes',pro:['ellos','ellas','ustedes'], gl:'他们/她们/诸位', E:'they / you all'},
+];
+/* 人称：前 3 个单数、后 3 个复数，选项与答案网格都按两行排 */
+const PERSON_ORD = ['第一人称单数','第二人称单数','第三人称单数',
+                    '第一人称复数','第二人称复数','第三人称复数'];
+const PERSON_ORD_EN = ['1st person singular','2nd person singular','3rd person singular',
+                       '1st person plural','2nd person plural','3rd person plural'];
+const PERS_ROW1 = [0,1,2], PERS_ROW2 = [3,4,5];
+const IMP_LABEL = {1:'tú', 2:'usted', 3:'nosotros', 4:'vosotros', 5:'ustedes'};
+const PRON = ['yo','tú','tu','él','ella','usted','nosotros','nosotras','vosotros','vosotras','ellos','ellas','ustedes'];
+/* 命令式只有 5 个人称（没有 yo），且用 usted / ustedes 而非 él / ella / ellos / ellas */
+const isImp = k => (k === 'ia' || k === 'in');
+/* 命令式专属的释义（usted 视作「您」，仍属第二人称）与序数 */
+const IMP_GLOSS = {1:{zh:'你',en:'you (informal)'}, 2:{zh:'您',en:'you (polite)'},
+                   3:{zh:'我们',en:'we'}, 4:{zh:'你们',en:'you all (Spain)'}, 5:{zh:'诸位',en:'you all'}};
+const IMP_ORD   = {1:{zh:'第二人称单数',en:'2nd person singular'},
+                   2:{zh:'第二人称单数（您）',en:'2nd person singular (polite)'},
+                   3:{zh:'第一人称复数',en:'1st person plural'},
+                   4:{zh:'第二人称复数',en:'2nd person plural'},
+                   5:{zh:'第二人称复数（诸位）',en:'2nd person plural (polite)'}};
+/* 命令式用专属标签，其余时态用通用标签 */
+const personLabel  = (i,k) => isImp(k) ? IMP_LABEL[i] : PERSONS[i].l;
+const personShort  = (i,k) => isImp(k) ? IMP_LABEL[i] : PERSONS[i].sl;
+const personGlossI = (i,k) => isImp(k) ? (lang()==='en'?IMP_GLOSS[i].en:IMP_GLOSS[i].zh)
+                                      : (lang()==='en'?PERSONS[i].E:PERSONS[i].gl);
+const personOrdI   = (i,k) => isImp(k) ? (lang()==='en'?IMP_ORD[i].en:IMP_ORD[i].zh)
+                                      : (lang()==='en'?PERSON_ORD_EN[i]:PERSON_ORD[i]);
+/* 命令式每格只对应一个代词（usted / ustedes…）；其余人称从候选里随机抽一个显示 */
+function personPro(i, k){
+  if(isImp(k)) return [IMP_LABEL[i]];
+  const p = PERSONS[i];
+  return (p.pro && p.pro.length) ? p.pro : [p.S];
+}
+/* 题目对应的时态键（转换模式问的是 tense2） */
+const qTense = q => (q.mode === 'shift' ? q.tense2 : q.tense);
+/* 四个练习模式。shift = 转换模式（同一动词换时态）；transfer = 平移模式（换一个动词） */
+const MODES = [
+  {k:'recognize', zh:'辨认模式', en:'Recognition',   d:'看一个变位形式，判断它是哪个人称',
+   ed:'See one conjugated form and tell which person it is'},
+  {k:'produce',   zh:'复现模式', en:'Production',    d:'给出人称与时态，直接写出变位',
+   ed:'Given a person and a tense, write the form'},
+  {k:'shift',     zh:'转换模式', en:'Tense shift',   d:'同一个动词：人称不变，只换一个时态',
+   ed:'Same verb and person — switch to another tense'},
+  {k:'transfer',  zh:'平移模式', en:'Verb transfer', d:'人称、时态都不变：照着 A 动词，写出 B 动词的变位',
+   ed:'Same person and tense — switch to another verb'},
+];
+const MODE_ZH = {}; MODES.forEach(m => MODE_ZH[m.k] = m.zh);
+const MODE_EN = {}; MODES.forEach(m => MODE_EN[m.k] = m.en);
+/* 「隐藏动词原形」只对这两个模式生效 */
+const INF_MODES = ['recognize','shift','transfer'];
+/* 出题人数：默认含 vosotros；关掉 setting.vosotros 后不再出第 6 人称（下标 4）的题 */
+const askedPersons = k => validPersons(k).filter(i => DB.settings.vosotros || i !== 4);
+/* 数据里的中文标签 → 英文 */
+const TAG_EN = {
+  '不规则':'irregular', '强过去式':'strong preterite', '不规则分词':'irregular participle',
+  '重音变化':'accent shift', '拼写变化':'spelling change', '高频':'high-frequency',
+};
+
+/* ============================================================
+   界面文案：中文 / 英文（英语模式）
+   ============================================================ */
+const I18N = {
+zh:{
+  htmlLang:'zh-CN',
+  title:'西语动词变位练习器',
+  sub: n => "Practicador de conjugaciones · 本地词库 <b>"+n+"</b> 个动词 · 支持 vosotros，不含 voseo",
+  statsBtn:'📊 学习统计',
+  hScope:'1 · 词库范围 <span class="meta">（难度与标签同时生效，取交集）</span>',
+  lvRow:'按等级：',
+  tagRow:'按标签：',
+  levelHint: s => '当前可练：'+s,
+  poolUnit:'个动词',
+  levelN: n => '本级共 '+n+' 个动词',
+  hMode:'2 · 练习模式 <span class="meta">（单选）</span>',
+  setBtn:'⚙ 设置', setOpen:'⚙ 收起设置',
+  setTitle:'练习设置',
+  setScope: m => '当前模式：'+m+'。用不上的设置项会置灰。',
+  cfgLevels:'A1–B2 全开',
+  cfgLevels2:'A1–B2 全开',
+  cfgTenses:'A2–B2 · 全部时态',
+  cfgTenses2:'A2–B2 · 只练简单时态',
+  lvOff2:'x',
+  hTense:'3 · 时态 <span class="meta">（自由多选，15 个时态全部可选）</span>',
+  tAll:'全选', tNone:'清空', tRec:'推荐时态组：',
+  tRecT: (lv,n) => '套用 '+lv+' 对应的 '+n+' 个时态',
+  tCount: (n,tot) => '已选 <b>'+n+'</b> / '+tot+' 个时态',
+  tCountNone:'<span style="color:var(--bad)">未选任何时态 —— 请至少选 1 个</span>',
+  tCountNa:'<span style="color:var(--sub)">本模式不按单个时态出题</span>',
+  tenseOff:'当前练习模式不会出这个时态（转换模式只练简单时态）',
+  tenseXfer:'（平移模式借用它判断词形是否齐备）',
+  lvHint:'A1 现在时 / 过去分词 · A2 +简单过去时、未完成时 · B1 +将来时、条件式、现在完成时、过去完成时 · B2 全部 15 个时态',
+  optOff:'当前练习模式用不上这一项',
+  tagAll:'全部动词', tagIrreg:'只练不规则', tagReg:'只练规则', tagFreq:'只练高频',
+  tagSpell:'只练拼写变化', tagStem:'只练词干变化',
+  optShowZh:'显示中文意思', optShowZhT:'控制题干下的中文释义（写出变位的模式都受此开关影响）',
+  optShowEn:'显示中文意思', optShowEnT:'控制题干下的中文释义',
+  optHideInf:'隐藏动词原形',
+  optHideInfT:'只在辨认模式与转换模式生效：题干不再给出动词原形，需要先从这个变位形式认出动词；'
+             +'作答后会自动显示（中文释义另由「显示中文意思」单独控制）',
+  optStrict:'严格要求重音', optStrictT:'关掉后「hablo / habló」这类只差重音的回答算对',
+  optAskTense:'辨认模式同时问时态', optAskTenseT:'辨认模式下除了人称，还要选出这个形式属于哪个时态',
+  optType:'答题方式', optTypeT:'点击切换手写 / 选择',
+  typeType:'答题方式：手写', typeChoice:'答题方式：选择',
+  optOnlyWrong:'只练我的错题', optOnlyWrongT:'题库只保留你做错过的动词（没有错题记录时不生效）',
+  optVosotros:'含 vosotros', optVosotrosT:'开启后题目里会包含第 6 人称（vosotros / vosotras）；关掉则完全不出该人称的题。该选项对全部练习模式有效。',
+  hideInfOff:'「隐藏动词原形」作用于辨认、转换、平移模式；复现模式必须看到原形，不受影响。',
+  hideInfOn:'原形已隐藏：题干不显示原形，作答后自动显示。',
+  hideInfOnNone:'原形已隐藏：<span style="color:var(--warn)">复现模式必须看到原形，'
+               +'这项设置当前不起作用</span>。',
+  hideInfZhWarn:'<span style="color:var(--warn)">中文释义仍会给出动词的含义，想彻底不认词，'
+               +'请一并关掉「显示中文意思」。</span>',
+  pool: (v,t) => '当前题库：<b>'+v+'</b> 个动词 / <b>'+t+'</b> 个时态',
+  poolWrong:'（只练错题）', poolNoTense:'当前题库：<span style="color:var(--bad)">还没有选择任何时态</span>',
+  poolNoTenseNa:'当前题库：<span style="color:var(--bad)">本模式不按单个时态出题</span>',
+  startNa:'换个模式吧',
+  warnShift:'「转换模式」需要至少 2 个时态',
+  warnTransfer:'「平移模式」需要题库里至少 2 个动词',
+  warnTail: x => '　<span style="color:var(--warn)">· 已选模式里的 '+x+' 才能出题，会自动改用其他模式</span>',
+  start:'开始练习 →', startPick:'请先选择时态', startEmpty:'题库为空',
+  keys:'快捷键：<kbd>1</kbd>–<kbd>6</kbd> 选人称，<kbd>Enter</kbd> 确认 / 下一题。',
+  hGuide:'变位规则速览',
+  guideOpen:'查看 →',
+  guideHint:'8 页简明讲解：从一般现在时到四种过去时、命令式、将来式与虚拟式，再专门整理正字法、词干变化和重音书写。每页的变位例子都展开成与练习模式同款的六人称表。复杂语法点都附权威外链。',
+  gdPrev:'← 上一页', gdNext:'下一页 →',
+  gdCount:(i,n) => '第 '+i+' / '+n+' 页',
+  gdLinks:'权威外链',
+  guideShortBtn:'变位规则速览 →',
+  lgIrr:'不规则', lgOrth:'正字法拼写变化', lgStem:'词干变化',
+  lgNote:'着色只落在真正变了的那几个字母上（如 poder→pue-do 只标 ue、tocar→to-qué 只标 qu）。',
+  tblAuth:'权威对照：', tblRae:'RAE 官方变位表',
+  relGrammar:'相关语法：', tblBtn: v => '看 '+v+' 的变位表',
+  dwTab:'变位表', dwPh:'输入原形 / 变位形式 / 释义…', dwCount: n => n+' 个动词',
+  dwHint:'左栏简单、右栏复合；命令式分肯定 / 否定。随时可拉开、可收回。',
+  affirm:'肯定', negative:'否定',
+  tblGap:'「前过去时」（hube + 分词）现代西语已基本不用，故留空。',
+  sugNone: q => '没找到「'+q+'」——试试动词原形。',
+  sugMore: n => '另有 '+n+' 个匹配…',
+  xferAlt:(f,ts,alts) => '说明：A 的 <b>'+f+'</b> 在「'+ts+'」里也读作同一个人称，所以 B 写成 '+alts+' 同样算对。',
+  footer:"变位数据来源：Fred Jehle's Conjugated Spanish Verb Database（CC BY-NC-SA 3.0，600+ 动词）<br>"
+        +"已剔除 voseo 专栏、修正源库个别重音错误；等级 / 中文释义为本程序自行标注。",
+  exit:'← 退出', prev:'上一题', navStats:'学习统计', navTable:'变位表查询', back:'← 返回',
+  progress: (i,n,p) => i+' / '+n+' 题 · 正确 '+p+'%',
+  zhOn:'中文：开', zhOff:'中文：关', zhT:'显示 / 隐藏题干下的中文释义',
+  mz:{recognize:'辨认模式 · 这个变位形式的主语是哪个人称？',
+      produce:'复现模式 · 写出该人称的变位',
+      shift:'转换模式 · 人称不变，换一个时态',
+      transfer:'平移模式 · 人称、时态都不变，换成另一个动词'},
+  mzSoft:{shift:' · 人称不变，换一个时态', transfer:' · 人称、时态都不变，换成另一个动词'},
+  sSrc:'原时态', sTgt:'目标时态', sMood:'语式', sTense:'时态', sForm:'形式',
+  transferHint:'照 A 的人称与时态，把 B 变位写出来',
+  peek:'看原形', peekT:'只显示本题的原形，不影响判定',
+  placeholder:'输入变位形式…',
+  check:'确认', next:'下一题 →', enterNext:'按 Enter 继续',
+  ok:'回答正确', bad:'回答错误', warn:'正确（重音需注意）',
+  yourAns:'你的答案：', blank:'（未作答）', correctAns:'正确答案：',
+  alsoW: x => '（也可写作 '+x+'）',
+  correctPerson:'正确人称：', tenseIs:'时态：',
+  homoLead: x => '注意：<b>'+x+'</b> 这个形式',
+  homoTense: x => '在「'+x+'」里同形',
+  homoPers: x => '同时对应「'+x+'」',
+  homoTail:'，所以以上任一选择都算正确。',
+  tenseWrong: (p, l, t) => '时态不对：'+p+'的形式在 '+l+' 中出现，没有「'+t+'」这一读法。',
+  tenseWrongNone: (p, t) => '时态不对：'+p+'的形式在本题所选时态里没有出现，没有「'+t+'」这一读法。',
+  tenseWrongNoneP:'本题所选时态里没有该形式',
+  cameFrom: x => '本题原本取自 <b>'+x+'</b>。',
+  gridLead: x => '这个时态下六个人称的完整变位（高亮为本题的人称）：',
+  shiftSame: (inf,a,b,p) => inf+'：'+a+' → '+b+'，人称 '+p,
+  shiftIdent: p => '注意：这两个时态在 '+p+' 上同形，所以换时态后写法不变。',
+  xferNote: (a,t,p,f,b) => a+' 的 '+t+' '+p+' 是 <b>'+f+'</b> → '+b+' 在同样的人称时态下应是 ',
+  gridLead2: (inf,t) => inf+' 在「'+t+'」下的完整变位（高亮为本题的人称）：',
+  hRec:'提示：本题只在', hRec2:'时态中选（简单/复合一眼可辨）。',
+  hRec3:'同一个形式可能属于多个时态或对应多个人称（如 nosotros 的 compramos 既是现在时也是简单过去时），选其中任何一种都算正确。',
+  hRecHide:'本题隐藏了原形：请直接从词尾判断人称。',
+  hProduce:'可直接输入变位形式，无需写主语代词。虚拟式过去未完成时的 -ra / -se 两种形式都算正确。',
+  hRefl:'这是自复动词，变位形式要带上代词（me / te / se / nos / os）才完整，例如 me acuesto、acuéstate。',
+  negImp:'⚠️ 否定命令式请写出完整形式（no + 动词）',
+  hShiftSame:'人称不变，语式不变，只把时态换成目标那一栏。',
+  hShiftCross:(a,b) => '人称不变；这一题连语式也要换（'+a+' → '+b+'），请一并留意。',
+  hShiftHide:'本题隐藏了原形：先从这个形式认出动词，再变到目标时态。',
+  hTransfer:'人称和时态都不变，只把动词换成 B；词尾规律与 A 相同，但 B 是不是规则动词要自己判断。'
+           +'虚拟式过去未完成时的 -ra / -se 两种形式都算正确。',
+  simple:'简单', compound:'复合', simpleT:'简单时态', compoundT:'复合时态',
+  groupAll:'全选', groupNone:'清空',
+  tenseQ:'这个形式属于哪个时态？', tenseQOnly: x => '· 只列'+x,
+  emptyPoolAlert:'题库为空：请检查难度 / 时态 / 错题设置。',
+  emptyNext:'题库为空：请返回调整难度 / 时态 / 错题设置。',
+  endConfirm: (n,p) => '结束本次练习？\n本次共答 '+n+' 题，正确率 '+p+'%。',
+  stStats:'学习统计', stAnswers:'累计答题', stAcc:'总正确率', stErr:'累计错误', stVerbs:'练习过的动词',
+  stHardest:'最容易错的动词', stNoErr:'还没有错误记录，先练几题吧。',
+  thVerb:'动词', thMean:'释义', thLv:'等级', thErrAtt:'错/答', thRate:'错误率',
+  stByTense:'各时态错误率', thTense:'时态', stNoData:'暂无数据。',
+  stByMode:'各模式正确率', thMode:'模式', thOkAtt:'对/答', thAcc:'正确率', stNoData2:'暂无数据',
+  stWrong:'错题本', stWrongN: n => '最近 '+n+' 条', stNoWrong:'还没有错题。',
+  thPerson:'人称', thYou:'你写的', thRight:'正确',
+  stData:'数据管理',
+  stDataHint:'统计数据保存在本机浏览器（localStorage），不会上传到任何服务器。'
+            +'更换浏览器或清理浏览器数据会丢失，建议定期导出备份。',
+  expJson:'导出 JSON', impJson:'导入 JSON', reset:'清空统计',
+  impOk:'导入成功。', impBad: m => '文件格式不正确：'+m,
+  resetConfirm:'确定清空全部答题统计与错题本？此操作不可恢复。',
+  totalLbl:'共', langLabel:'中文',
+},
+en:{
+  htmlLang:'en',
+  title:'Spanish Verb Conjugation Trainer',
+  sub: n => "Practicador de conjugaciones · <b>"+n+"</b> verbs bundled · vosotros included, no voseo",
+  statsBtn:'📊 Study stats',
+  hScope:'1 · Verb scope <span class="meta">(level and tag both apply — intersection)</span>',
+  lvRow:'By level:',
+  tagRow:'By tag:',
+  levelHint: s => 'Currently practising: '+s,
+  poolUnit:'verbs',
+  levelN: n => n+' verbs in this level',
+  hMode:'2 · Practice mode <span class="meta">(single choice)</span>',
+  setBtn:'⚙ Settings', setOpen:'⚙ Hide settings',
+  setTitle:'Practice settings',
+  setScope: m => 'Current mode: '+m+'. Options that do not apply are greyed out.',
+  cfgLevels:'A1–B2, all levels',
+  cfgLevels2:'A1–B2, all levels',
+  cfgTenses:'A2–B2, all tenses',
+  cfgTenses2:'A2–B2, simple tenses only',
+  lvOff2:'x',
+  hTense:'3 · Tenses <span class="meta">(free multi-select — all 15 tenses are available)</span>',
+  tAll:'All', tNone:'None', tRec:'Tense sets:',
+  tRecT: (lv,n) => 'Apply the '+n+' tenses for '+lv,
+  tCount: (n,tot) => '<b>'+n+'</b> / '+tot+' tenses selected',
+  tCountNone:'<span style="color:var(--bad)">No tense selected — pick at least one</span>',
+  tCountNa:'<span style="color:var(--sub)">This mode does not pick tenses</span>',
+  tenseOff:'This mode never uses this tense (tense shift practises simple tenses only)',
+  tenseXfer:'(verb transfer borrows it to check the forms exist)',
+  lvHint:'A1 present / participle · A2 + preterite, imperfect · B1 + future, conditional, present perfect, pluperfect · B2 all 15 tenses',
+  optOff:'Not used by the current practice mode',
+  tagAll:'All verbs', tagIrreg:'Irregular only', tagReg:'Regular only', tagFreq:'High-frequency only',
+  tagSpell:'Spelling change only', tagStem:'Stem change only',
+  optShowZh:'Show meaning', optShowZhT:'Show or hide the meaning under the prompt',
+  optShowEn:'Show meaning', optShowEnT:'Show or hide the English meaning under the prompt',
+  optHideInf:'Hide the infinitive',
+  optHideInfT:'Only affects recognition and tense-shift: the infinitive is hidden, '
+             +'so you must identify the verb from the conjugated form. It is revealed after you answer.',
+  optStrict:'Require exact accents', optStrictT:'Turn off to accept answers that only differ in accents',
+  optAskTense:'Also ask the tense', optAskTenseT:'In recognition mode, also pick which tense the form belongs to',
+  optType:'Answer input', optTypeT:'Click to switch between typing and multiple choice',
+  typeType:'Answer input: type', typeChoice:'Answer input: choice',
+  optOnlyWrong:'Drill my mistakes only', optOnlyWrongT:'Keep only verbs you have got wrong (ignored if you have no mistakes yet)',
+  optVosotros:'Include vosotros', optVosotrosT:'On: questions may use the 6th person (vosotros / vosotras). Off: that person never appears. Applies to every practice mode.',
+  hideInfOff:'“Hide the infinitive” applies to recognition, tense shift and verb transfer; production must show it, so it is unaffected.',
+  hideInfOn:'Infinitive hidden: the prompt no longer shows it, and it comes back automatically after you answer.',
+  hideInfOnNone:'Infinitive hidden: <span style="color:var(--warn)">production must show the infinitive, '
+               +'so this setting does nothing right now</span>.',
+  hideInfZhWarn:'<span style="color:var(--warn)">The meaning still gives the verb away — turn off '
+               +'“Show meaning” as well if you want a real challenge.</span>',
+  pool: (v,t) => 'Current pool: <b>'+v+'</b> verbs / <b>'+t+'</b> tenses',
+  poolWrong:' (mistakes only)', poolNoTense:'Current pool: <span style="color:var(--bad)">no tense selected yet</span>',
+  poolNoTenseNa:'Current pool: <span style="color:var(--bad)">this mode does not pick tenses</span>',
+  startNa:'Pick another mode',
+  warnShift:'“Tense shift” needs at least 2 tenses',
+  warnTransfer:'“Verb transfer” needs at least 2 verbs in the pool',
+  warnTail: x => '　<span style="color:var(--warn)">· '+x+' to work; other modes will be used instead</span>',
+  start:'Start →', startPick:'Pick a tense first', startEmpty:'Pool is empty',
+  keys:'Shortcuts: <kbd>1</kbd>–<kbd>6</kbd> pick a person, <kbd>Enter</kbd> submit / next.',
+  hGuide:'Conjugation rules at a glance',
+  guideOpen:'Open →',
+  guideHint:'Eight short pages: the present, the four past tenses, the imperative, the future and the subjunctive, plus round-ups of spelling, stem changes and written accents. Every conjugation example is laid out as a full six-person table, exactly as the app shows a correct answer. Complex points come with authoritative links.',
+  gdPrev:'← Previous', gdNext:'Next →',
+  gdCount:(i,n) => 'Page '+i+' / '+n,
+  gdLinks:'Authoritative sources',
+  guideShortBtn:'Conjugation rules →',
+  lgIrr:'irregular', lgOrth:'spelling change', lgStem:'stem change',
+  lgNote:'Only the letters that actually change are marked (poder → pue-do marks just ue; tocar → to-qué marks just qu).',
+  tblAuth:'Official reference:', tblRae:'RAE conjugation table',
+  relGrammar:'Related grammar: ', tblBtn: v => 'See the '+v+' table',
+  dwTab:'Table', dwPh:'Infinitive, conjugated form or meaning…', dwCount: n => n+' verbs',
+  dwHint:'Simple tenses on the left, compound on the right; the imperative shows affirmative vs. negative. Pull open or closed any time.',
+  affirm:'affirmative', negative:'negative',
+  tblGap:'The pretérito anterior (hube + participle) is no longer used in modern Spanish, so this slot stays blank.',
+  sugNone: q => 'Nothing matches “'+q+'” — try an infinitive.',
+  sugMore: n => n+' more matches…',
+  xferAlt:(f,ts,alts) => 'Note: A’s '+f+' also reads as the same person in the '+ts+', so writing '+alts+' for B counts as correct too.',
+  footer:"Conjugation data: Fred Jehle's Conjugated Spanish Verb Database (CC BY-NC-SA 3.0, 600+ verbs).<br>"
+        +"Voseo columns removed and a few accent errors in the source corrected; levels and meanings are our own.",
+  exit:'← Exit', prev:'Previous', navStats:'Study stats', navTable:'Conjugation table', back:'← Back',
+  progress: (i,n,p) => i+' / '+n+' · '+p+'% correct',
+  zhOn:'Meaning: on', zhOff:'Meaning: off', zhT:'Show / hide the meaning under the prompt',
+  mz:{recognize:'Recognition · which person is the subject of this form?',
+      produce:'Production · write the form for this person',
+      shift:'Tense shift · same person, another tense',
+      transfer:'Verb transfer · same person and tense, another verb'},
+  mzSoft:{shift:' · same person, another tense', transfer:' · same person and tense, another verb'},
+  sSrc:'Source', sTgt:'Target', sMood:'Mood', sTense:'Tense', sForm:'Form',
+  transferHint:'Conjugate B with the same person and tense as A',
+  peek:'Show infinitive', peekT:'Reveal the infinitive for this question only; it does not affect scoring',
+  placeholder:'Type the conjugated form…',
+  check:'Check', next:'Next →', enterNext:'Press Enter to continue',
+  ok:'Correct', bad:'Incorrect', warn:'Correct — mind the accent',
+  yourAns:'Your answer: ', blank:'(blank)', correctAns:'Correct answer: ',
+  alsoW: x => '(also written '+x+')',
+  correctPerson:'Correct person: ', tenseIs:'Tense: ',
+  homoLead: x => 'Note: <b>'+x+'</b> is the same form',
+  homoTense: x => 'in “'+x+'”',
+  homoPers: x => 'and also stands for “'+x+'”',
+  homoTail:', so any of the choices above counts as correct.',
+  tenseWrong: (p, l, t) => 'Wrong tense: the '+p+' form appears in '+l+', which does not include “'+t+'”.',
+  tenseWrongNone: (p, t) => 'Wrong tense: the '+p+' form does not appear in the tenses chosen for this question, '
+                           +'so “'+t+'” is not a reading of it.',
+  tenseWrongNoneP:'none of the tenses offered here',
+  cameFrom: x => 'This question was originally taken from <b>'+x+'</b>.',
+  gridLead: x => 'All six persons in this tense (your person is highlighted):',
+  shiftSame: (inf,a,b,p) => inf+': '+a+' → '+b+', person '+p,
+  shiftIdent: p => 'Note: the two tenses look identical in the '+p+' form, so the spelling does not change.',
+  xferNote: (a,t,p,f,b) => a+' in the '+t+' ('+p+') is <b>'+f+'</b> → '+b+' in the same person and tense must be ',
+  gridLead2: (inf,t) => 'Full conjugation of '+inf+' in the '+t+' (your person is highlighted):',
+  hRec:'Hint: only ', hRec2:' tenses are offered here (simple vs. compound is easy to tell apart).',
+  hRec3:'One form can belong to several tenses or match several persons (e.g. nosotros compramos is both present '
+      +'and preterite); any of those readings counts as correct.',
+  hRecHide:'The infinitive is hidden here: judge the person from the ending alone.',
+  hProduce:'You can type just the form — no subject pronoun needed. For the imperfect subjunctive both the -ra and -se forms are accepted.',
+  hRefl:'This is a reflexive verb: the form needs its pronoun (me / te / se / nos / os), e.g. me acuesto, acuéstate.',
+  negImp:'⚠️ For the negative imperative write the full form (no + verb)',
+  hShiftSame:'Same person, same mood — just change the tense to the target column.',
+  hShiftCross:(a,b) => 'Same person, but this one also changes mood ('+a+' → '+b+'), so watch out.',
+  hShiftHide:'The infinitive is hidden: identify the verb from this form first, then shift it to the target tense.',
+  hTransfer:'Person and tense stay the same; you only change the verb to B. The endings follow A, but judge for '
+           +'yourself whether B is regular. Both -ra and -se forms are accepted.',
+  simple:'Simple', compound:'Compound', simpleT:'Simple tenses', compoundT:'Compound tenses',
+  groupAll:'All', groupNone:'None',
+  tenseQ:'Which tense does this form belong to?', tenseQOnly: x => '· '+x+' only',
+  emptyPoolAlert:'The pool is empty: check your level / tense / mistakes settings.',
+  emptyNext:'The pool is empty. Go back and adjust level / tenses / mistakes.',
+  endConfirm: (n,p) => 'End this session?\n'+n+' answered, accuracy '+p+'%.',
+  stStats:'Study stats', stAnswers:'Answers', stAcc:'Accuracy', stErr:'Wrong', stVerbs:'Verbs practised',
+  stHardest:'Most-missed verbs', stNoErr:'No mistakes recorded yet — answer a few questions first.',
+  thVerb:'Verb', thMean:'Meaning', thLv:'Level', thErrAtt:'Wrong/Ans', thRate:'Error rate',
+  stByTense:'Error rate by tense', thTense:'Tense', stNoData:'No data yet.',
+  stByMode:'Accuracy by mode', thMode:'Mode', thOkAtt:'Right/Ans', thAcc:'Accuracy', stNoData2:'No data yet',
+  stWrong:'Mistake log', stWrongN: n => 'latest '+n, stNoWrong:'No mistakes yet.',
+  thPerson:'Person', thYou:'You wrote', thRight:'Correct',
+  stData:'Data',
+  stDataHint:'Your stats are stored in this browser (localStorage) and never uploaded anywhere. '
+            +'Clearing browser data or switching browsers loses them, so export a backup once in a while.',
+  expJson:'Export JSON', impJson:'Import JSON', reset:'Reset stats',
+  impOk:'Imported successfully.', impBad: m => 'Wrong file format: '+m,
+  resetConfirm:'Reset all answer stats and the mistake log? This cannot be undone.',
+  totalLbl:'of', langLabel:'English',
+},
+};
+function lang(){ return (DB && DB.settings && DB.settings.lang === 'en') ? 'en' : 'zh'; }
+function tr(k, ...a){
+  const d = I18N[lang()][k];
+  if(d === undefined) return I18N.zh[k] !== undefined ? I18N.zh[k] : k;
+  return (typeof d === 'function') ? d.apply(null, a) : d;
+}
+const tName = k => (T[k] ? (lang()==='en' ? T[k].en : T[k].zh) : k);
+const tEs   = k => (T[k] ? T[k].es : k);
+const gName = k => (G[k] ? (lang()==='en' ? G[k].en : G[k].zh) : k);
+const gEs   = k => (G[k] ? G[k].es : k);
+const modeName = k => (lang()==='en' ? (MODE_EN[k]||k) : (MODE_ZH[k]||k));
+const modeDesc = k => { const m = MODES.filter(x=>x.k===k)[0]; return m ? (lang()==='en'?m.ed:m.d) : ''; };
+const personGloss = i => (lang()==='en' ? PERSONS[i].E : PERSONS[i].gl);
+const personOrd  = i => (lang()==='en' ? PERSON_ORD_EN[i] : PERSON_ORD[i]);
+function tagName(x){
+  if(lang() !== 'en') return x;
+  if(TAG_EN[x]) return TAG_EN[x];
+  const m = /^词干变化\((.+)\)$/.exec(x);
+  return m ? ('stem change (' + m[1] + ')') : x;
+}
+/* 主题词：某个动词当前的释义（中文 / 英文） */
+const meaningOf = v => (v && (lang()==='en' ? (v.e || v.z) : v.z)) || '';
+
+/* ---------------- 工具 ---------------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const norm = s => String(s).trim().toLowerCase().replace(/\s+/g,' ');
+const stripAcc = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ñ/g,'n');
+const rnd = n => Math.floor(Math.random()*n);
+const pick = a => a[rnd(a.length)];
+
+function forms(v, k){
+  if(!v.t[k]) return null;
+  const f = v.t[k].split('|');
+  return f.length === 6 ? f : null;
+}
+/* 自复动词（acostarse / irse …）：变位形式带 me/te/se/nos/os，答案要连代词一起写。
+   与 build_final.py / classify.py 的 is_refl 判定一致（irse 只有 4 个字母，别再卡长度）。 */
+function isRefl(inf){
+  inf = String(inf || '');
+  return inf.length >= 4 && inf.endsWith('se') && ['ar','er','ir'].indexOf(inf.slice(-4, -2)) > -1;
+}
+/* 一个形式在整张变位表里的全部「人称 × 时态」读法
+   例：compramos → [{p:3,k:'p'}, {p:3,k:'pr'}]；habla → [{p:1,k:'ia'}, {p:2,k:'p'}]
+   用于同形判定：这些都是语言学上成立的正解读法，选任一个都应算对 */
+function formHits(v, str){
+  const tgt = String(str == null ? '' : str).trim();
+  const out = [];
+  if(!tgt) return out;
+  TENSES.forEach(t=>{
+    const f = forms(v, t.k);
+    if(!f) return;
+    for(let i=0;i<6;i++) if(f[i] && f[i].trim() === tgt) out.push({p:i, k:t.k});
+  });
+  return out;
+}
+const uniq = a => [...new Set(a)];
+/* 数据里每个形式的「不规则类型」标记串（'.' 规则 / o 正字法拼写 / s 词干变化 / i 其他不规则），
+   与 TENSES 的 key 对应；只有含非规则形式的时态才会出现在 v.c 里 */
+const codesOf = (v, k) => (v && v.c && v.c[k]) || '';
+/* 与 codesOf 平行：每个形式「真正变了的那几个字母」区间 [起, 止]（见 classify.form_hls）。
+   只有非规则形式才有区间，规则形式是 null */
+const hlOf = (v, k) => (v && v.h && v.h[k]) || null;
+/* 把形式切成「不变的前段 + 变化段 + 不变的后段」；没有区间时整词算变化段，
+   这样即使数据里缺 h 也仍是整词着色，不会出现「判了不规则却没颜色」 */
+function marked(val, hi){
+  if(!hi) return esc(val);
+  const s = Math.max(0, Math.min(hi[0], val.length));
+  const e = Math.max(s, Math.min(hi[1], val.length));
+  return esc(val.slice(0, s)) + '<i class="hl">' + esc(val.slice(s, e)) + '</i>' + esc(val.slice(e));
+}
+/* 变位形式着色图例 */
+function formLegend(){
+  return '<div class="legend">'
+    + '<span><i class="k" style="background:var(--f-irr)"></i>'+esc(tr('lgIrr'))+'</span>'
+    + '<span><i class="k" style="background:var(--f-orth)"></i>'+esc(tr('lgOrth'))+'</span>'
+    + '<span><i class="k" style="background:var(--f-stem)"></i>'+esc(tr('lgStem'))+'</span>'
+    + '</div>'
+    + '<div class="legend-note">'+esc(tr('lgNote'))+'</div>';
+}
+/* 人称 × 形式的紧凑网格：第一行单数、第二行复数。
+   命令式没有 yo，则第一行 tú / usted / nosotros，第二行 vosotros / ustedes。
+   hiSet   = 需要高亮的人称下标集合（可省略）
+   mark    = 该时态 6 个位置的不规则类型标记串（见 codesOf）
+   compact = 用短人称（yo / tú / él / nosotros…）—— 右栏变位表只有一列，长标签放不下
+   hl      = 该时态 6 个位置「变化字母」的区间（见 hlOf），只染那一段 */
+const TBL_PERSON = ['yo','tú','él','nosotros','vosotros','ellos'];
+function personGrid(f, hiSet, tenseKey, mark, compact, hl){
+  const imp = (tenseKey === 'ia' || tenseKey === 'in');
+  const idx = imp ? [1,2,3,4,5] : [0,1,2,3,4,5];
+  const codes = mark ? String(mark) : '';
+  const cells = idx.map(i => {
+    const val = String((f && f[i]) || '').trim();
+    const lb  = imp ? IMP_LABEL[i] : (compact ? TBL_PERSON[i] : PERSONS[i].l);
+    const c   = codes[i] || '.';
+    let cls = '', cellCls = '';
+    if(val){
+      if(c === 'i')      cls += ' w-i';
+      else if(c === 'o') cls += ' w-o';
+      else if(c === 's') cls += ' w-s';
+      /* 长形式降一档字号；仍旧过长（复合时态）再降一档，并收窄内边距 */
+      if(val.length >= 13){
+        cellCls = ' lg';
+        if(val.length >= 17) cls += ' xs'; else cls += ' sm';
+      }
+    }
+    return '<div class="pcell' + (hiSet && hiSet.has(i) ? ' hi' : '') + (val ? '' : ' empty')
+         + cellCls + '"'
+         + ' title="' + esc(compact ? PERSONS[i].S : lb) + '"><span class="pl">' + esc(lb) + '</span>'
+         + '<b' + (cls.trim() ? ' class="'+cls.trim()+'"' : '') + '>'
+         + (val ? marked(val, (c !== '.' && hl) ? hl[i] : null) : '—') + '</b></div>';
+  });
+  return '<div class="pgrid">'
+       + '<div class="prow">' + cells.slice(0,3).join('') + '</div>'
+       + '<div class="prow">' + cells.slice(3,6).join('') + '</div>'
+       + '</div>';
+}
+/* 虚拟式过去未完成时的 -ra / -se 互换（按后缀长度优先匹配） */
+const SI_RULES = [
+  ['iéramos','iésemos'],['áramos','ásemos'],['iésemos','iéramos'],['ásemos','áramos'],
+  ['iérais','iéseis'],['árais','áseis'],['iéseis','iérais'],['áseis','árais'],
+  ['ierais','ieseis'],['ieras','ieses'],['ieran','iesen'],['iera','iese'],
+  ['ieseis','ierais'],['ieses','ieras'],['iesen','ieran'],['iese','iera'],
+  ['arais','aseis'],['aras','ases'],['aran','asen'],['ara','ase'],
+  ['aseis','arais'],['ases','aras'],['asen','aran'],['ase','ara'],
+  ['erais','eseis'],['eras','eses'],['eran','esen'],['era','ese'],
+  ['eseis','erais'],['eses','eras'],['esen','eran'],['ese','era'],
+].sort((a,b) => b[0].length - a[0].length);
+function siAlt(form){
+  const parts = form.split(' ');
+  const w = parts[0];
+  for(const [suf, rep] of SI_RULES){
+    if(w.length > suf.length && w.endsWith(suf)){
+      parts[0] = w.slice(0, -suf.length) + rep;
+      return parts.join(' ');
+    }
+  }
+  return form;
+}
+/* 去掉用户答案中可能多写的代词、标点 */
+function cleanAnswer(s){
+  let x = String(s).trim().replace(/[¡!¿?.,;]+$/g,'').replace(/^[¡¿]+/g,'');
+  x = x.replace(/\s+/g,' ');
+  const w = x.split(' ');
+  if(w.length > 1 && PRON.includes(w[0].toLowerCase())) x = w.slice(1).join(' ');
+  return x;
+}
+/* 判断答案：返回 {ok, soft} soft=true 表示只是重音有误
+   correct 可以是单个形式，也可以是一组「都算对」的形式（平移模式里 A 出示的形式
+   若本身有多重读法，B 在那些读法下的形式一并接受） */
+function judge(user, correct, strict, tense){
+  const u = cleanAnswer(user);
+  if(!u) return {ok:false, soft:false};
+  const alts = [];
+  (Array.isArray(correct) ? correct : [correct]).forEach(c=>{
+    if(c == null) return;
+    alts.push(c);
+    if(tense === 'si' || tense === 'sq'){ const s = siAlt(c); if(s !== c) alts.push(s); }
+  });
+  let softHit = false;
+  for(const a of alts){
+    if(norm(u) === norm(a)) return {ok:true, soft:false};
+    /* 先用整个备选集找「完全一致」，都找不到才退回到只差重音的宽容判定 */
+    if(stripAcc(norm(u)) === stripAcc(norm(a))) softHit = true;
+  }
+  if(softHit) return {ok: !strict, soft:true};
+  return {ok:false, soft:false};
+}
+
+/* ============================================================
+   本地存储 / 统计
+   ============================================================ */
+const LS = 'es_conj_app_v1';
+let DB = {
+  settings: null,
+  stats: { verbs:{}, tenses:{}, modes:{}, total:{att:0,err:0}, wrong:[] }
+};
+function loadDB(){
+  let fresh = false;
+  try{
+    const raw = localStorage.getItem(LS);
+    if(raw){ const o = JSON.parse(raw); DB = Object.assign(DB, o); }
+    else fresh = true;
+  }catch(e){ console.warn('读取本地数据失败', e); fresh = true; }
+  DB.settings = Object.assign(defaultSettings(), DB.settings || {});
+  /* 第一次打开：按浏览器语言决定中文 / 英语界面（之后一律以本地保存的选择为准） */
+  if(fresh) DB.settings.lang = detectLang();
+  sanitizeSettings();
+  DB.stats = Object.assign({verbs:{},tenses:{},modes:{},total:{att:0,err:0},wrong:[]}, DB.stats || {});
+}
+/* 浏览器语言不是中文时默认走英语模式 */
+function detectLang(){
+  try{ return /^zh/i.test((navigator && navigator.language) || '') ? 'zh' : 'en'; }
+  catch(e){ return 'zh'; }
+}
+function saveDB(){
+  try{ localStorage.setItem(LS, JSON.stringify(DB)); }
+  catch(e){ console.warn('保存失败', e); }
+}
+/* 词表里实际出现的等级：新增 C1/C2 词汇后会自动出现在筛选行里，
+   没有该等级的动词时不显示空按钮 */
+function levelsInData(){ return LEVELS.filter(lv => VERBS.some(v => v.l === lv)); }
+function defaultSettings(){
+  return {
+    levels: levelsInData().length ? levelsInData() : ['A1'], modes:['produce'],
+    tenses: ALL_TENSE_KEYS.slice(),
+    showZh:true, strictAccent:true, inputMode:'type', onlyWrong:false, askTense:false,
+    tagFilter:'', hideInf:false, vosotros:true, lang:'zh'
+  };
+}
+/* 归一化设置：时态只保留合法键并按固定顺序排列；难度至少保留 1 项；
+   出题范围（levels / tenses）在「模式设置」里按模式自动描画 */
+function sanitizeSettings(){
+  const s = DB.settings;
+  if(!Array.isArray(s.levels)  || !s.levels.length)  s.levels = levelsInData();
+  s.levels = LEVELS.filter(lv => s.levels.includes(lv));
+  if(!Array.isArray(s.modes)   || !s.modes.length)   s.modes = ['produce'];
+  /* 练习模式为单选：数据里若残留旧的多选值，只留第一个 */
+  s.modes = MODES.map(m => m.k).filter(m => s.modes.includes(m)).slice(0, 1);
+  if(!s.modes.length) s.modes = ['produce'];
+  if(!Array.isArray(s.tenses)) s.tenses = [];
+  syncTenseOrder();
+  if(typeof s.tagFilter !== 'string') s.tagFilter = '';
+  s.inputMode = s.inputMode === 'choice' ? 'choice' : 'type';
+  s.hideInf = !!s.hideInf;        /* 辨认 / 转换 / 平移模式隐藏动词原形 */
+  s.vosotros = s.vosotros !== false;   /* 默认出 vosotros（第 6 人称）的题 */
+  s.lang = s.lang === 'en' ? 'en' : 'zh';
+}
+function recordAnswer(q){
+  const st = DB.stats;
+  const vb = st.verbs[q.inf] || (st.verbs[q.inf] = {att:0,err:0,byT:{},last:0});
+  vb.att++; vb.last = Date.now();
+  if(!q.correct) vb.err++;
+  const ten = vb.byT[q.tense] || (vb.byT[q.tense] = {att:0,err:0});
+  ten.att++; if(!q.correct) ten.err++;
+  const ts = st.tenses[q.tense] || (st.tenses[q.tense] = {att:0,err:0});
+  ts.att++; if(!q.correct) ts.err++;
+  const ms = st.modes[q.mode] || (st.modes[q.mode] = {att:0,err:0});
+  ms.att++; if(!q.correct) ms.err++;
+  st.total.att++; if(!q.correct) st.total.err++;
+  if(!q.correct){
+    st.wrong.unshift({inf:q.inf, tense:q.tense, p:q.person, mode:q.mode,
+                      user:q.userAnswer, ans:q.answer, t:Date.now()});
+    st.wrong = st.wrong.slice(0, 300);
+  }
+  saveDB();
+}
+
+/* ============================================================
+   主页
+   ============================================================ */
+/* 静态文案：随语言切换重刷（标题、小节名、按钮等） */
+function applyStatic(){
+  if(document.documentElement) document.documentElement.lang = tr('htmlLang');
+  $('g-title').textContent = tr('title');
+  $('g-sub').innerHTML = tr('sub', VERBS.length);
+  $('m-stats-btn').textContent = tr('statsBtn');
+  $('h-scope').innerHTML = tr('hScope');
+  $('h-mode').innerHTML = tr('hMode');
+  $('h-tense').innerHTML = tr('hTense');
+  $('m-t-all').textContent = tr('tAll');
+  $('m-t-none').textContent = tr('tNone');
+  $('m-opt-sh').textContent = tr('setTitle');
+  $('m-keys').innerHTML = tr('keys');
+  renderGuideHome();
+  $('g-footer').innerHTML = tr('footer');
+  $('p-exit').textContent = tr('exit');
+  $('p-prev').textContent = tr('prev');
+  $('p-table').textContent = tr('dwTab');
+  $('p-table').title = tr('dwHint');
+  $('p-zh').title = tr('zhT');
+  $('s-back').textContent = tr('back');
+  $('s-nav').textContent = tr('navStats');
+  /* 右栏变位表 */
+  $('dw-ttl').textContent = tr('navTable');
+  $('dw-tab-lb').textContent = tr('dwTab');
+  $('dw-tab').title = tr('dwHint');
+  $('dw-q').setAttribute('placeholder', tr('dwPh'));
+  $('dw-q').setAttribute('aria-label', tr('navTable'));
+  renderLangSw();
+}
+/* 顶部语言切换按钮 */
+function renderLangSw(){
+  const box = $('g-lang'); box.innerHTML = '';
+  [['zh','中文'],['en','English']].forEach(([k, label])=>{
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.lang = k;
+    b.className = 'lbtn';
+    b.setAttribute('aria-pressed', lang() === k);
+    b.textContent = label;
+    b.onclick = ()=>{ if(DB.settings.lang === k) return; DB.settings.lang = k; saveDB(); rerender(); };
+    box.appendChild(b);
+  });
+}
+/* 语言切换后只重刷当前那一屏 */
+function rerender(){
+  applyStatic();
+  if(!$('scr-menu').classList.contains('hidden'))     renderMenu();
+  if(!$('scr-practice').classList.contains('hidden')) renderPractice();
+  if(!$('scr-stats').classList.contains('hidden'))    renderStats();
+  if(!$('scr-guide').classList.contains('hidden'))    renderGuide();
+  if(DW_OPEN) renderTable();          /* 右栏开着时一并跟着换语言 */
+}
+/* 设置抽屉是否展开（默认收起；展开状态在重绘之间保持） */
+let SET_OPEN = false;
+/* 每个练习模式允许的「难度级别」范围。时态一律不限制：
+   平移模式虽然不按单个时态抽题，但它借用所选时态来判断「B 动词在这个人称时态下有没有形式」，
+   所以它的时态必须可选，不能锁死。 */
+function modeCfg(k){
+  switch(k){
+    case 'shift':    return {levels:['A2','B1','B2']};
+    default:         return {levels:['A1','A2','B1','B2']};
+  }
+}
+const isSimple = k => !(T[k] && T[k].cp);
+/* 把 levels 收敛到 mode 允许的范围：至少保留一个，否则退回该模式的首个可选级别 */
+function clampScope(mode){
+  const s = DB.settings, cfg = modeCfg(mode);
+  if(!Array.isArray(s.tenses)) s.tenses = [];
+  const valid = cfg.levels.filter(lv => VERBS.some(v => v.l===lv));
+  s.levels = (s.levels||[]).filter(lv => valid.includes(lv));
+  if(!s.levels.length) s.levels = [valid[0]];
+}
+/* 设置项跟着已选模式走：用不上的项不消失，直接置灰不可点 */
+function optUsable(k, mode){
+  switch(k){
+    /* 辨认模式是「选人称」，不需要手写，也不判重音 */
+    case 'strictAccent': return mode !== 'recognize';
+    case 'type':         return mode !== 'recognize';
+    /* 「同时问时态」只有辨认模式用得上 */
+    case 'askTense':     return mode === 'recognize';
+    /* 复现模式必须看到原形，「隐藏原形」只对辨认 / 转换 / 平移生效 */
+    case 'hideInf':      return mode !== 'produce';
+    default:             return true;
+  }
+}
+function renderMenu(){
+  const s = DB.settings;
+  syncTenseOrder();
+  applyStatic();
+  // ---- 1 · 词库范围：等级（多选）+ 标签（单选）取交集 ----
+  const lvBox = $('m-levels'); lvBox.innerHTML = '';
+  const lvLbl = document.createElement('span');
+  lvLbl.className = 'meta'; lvLbl.textContent = tr('lvRow');
+  lvBox.appendChild(lvLbl);
+  LEVELS.forEach(lv=>{
+    const n = VERBS.filter(v=>v.l===lv).length;
+    /* 该等级没有动词、又没被选中时就不画这个按钮，免得出现两个永远灰着的空档 */
+    if(!n && !s.levels.includes(lv)) return;
+    const b = document.createElement('button');
+    b.className='chip'; b.dataset.lv = lv;
+    b.setAttribute('aria-pressed', s.levels.includes(lv));
+    b.innerHTML = lv + ' <span style="opacity:.65;font-size:12px">'+n+'</span>';
+    b.title = tr('levelN', n);
+    b.onclick = ()=>{
+      const i = s.levels.indexOf(lv);
+      if(i>-1){ if(s.levels.length>1) s.levels.splice(i,1); } else s.levels.push(lv);
+      saveDB(); renderMenu();
+    };
+    lvBox.appendChild(b);
+  });
+
+  const tagBox = $('m-tags'); tagBox.innerHTML='';
+  const tagLbl = document.createElement('span');
+  tagLbl.className = 'meta'; tagLbl.textContent = tr('tagRow');
+  tagBox.appendChild(tagLbl);
+  const tagOpts = [
+    {k:'',        lbl:()=>tr('tagAll')},
+    {k:'不规则',   lbl:()=>tr('tagIrreg')},
+    {k:'规则',    lbl:()=>tr('tagReg')},
+    {k:'高频',    lbl:()=>tr('tagFreq')},
+    {k:'拼写变化', lbl:()=>tr('tagSpell')},
+    {k:'词干变化', lbl:()=>tr('tagStem')},
+  ];
+  tagOpts.forEach(o=>{
+    const n = VERBS.filter(v => tagMatch(v, o.k)).length;
+    const b=document.createElement('button');
+    b.className='chip sm'; b.dataset.tag = o.k;
+    b.setAttribute('aria-pressed', (s.tagFilter||'')===o.k);
+    b.innerHTML = o.lbl() + ' <span style="opacity:.6;font-size:12px">'+n+'</span>';
+    b.onclick = ()=>{ s.tagFilter = (s.tagFilter===o.k ? '' : o.k); saveDB(); renderMenu(); };
+    tagBox.appendChild(b);
+  });
+  /* 汇总：等级 ∩ 标签 ∩ 时态之后实际能出题的动词数，让「交集」一目了然 */
+  const poolN = buildPool().length;
+  const lvCounts = s.levels.map(x => x + ' ' + VERBS.filter(v=>v.l===x).length).join(' + ');
+  $('m-level-hint').innerHTML = esc(tr('levelHint', lvCounts))
+      + ' · <b>' + poolN + '</b> ' + esc(tr('poolUnit'));
+  $('m-lv-tense-hint').textContent = tr('lvHint');
+
+  // ---- 2 · 练习模式（单选）：切换时态选择不受影响，只收敛难度级别 ----
+  const moBox = $('m-modes'); moBox.innerHTML='';
+  MODES.forEach(m=>{
+    const b=document.createElement('button');
+    b.className='chip'; b.dataset.mode = m.k;
+    b.setAttribute('aria-pressed', s.modes[0] === m.k);
+    b.textContent = modeName(m.k);
+    b.title = modeDesc(m.k);
+    b.onclick = ()=>{
+      if(s.modes[0] === m.k) return;
+      s.modes = [m.k];
+      saveDB(); renderMenu();
+    };
+    moBox.appendChild(b);
+  });
+  /* 当前模式的玩法：按钮下方单独一行 */
+  $('m-mode-rule').innerHTML = '<b>' + esc(modeName(s.modes[0])) + '</b> · ' + esc(modeDesc(s.modes[0]));
+  const setBtn = $('m-set');
+  setBtn.textContent = SET_OPEN ? tr('setOpen') : tr('setBtn');
+  setBtn.setAttribute('aria-expanded', SET_OPEN ? 'true' : 'false');
+  setBtn.onclick = ()=>{ SET_OPEN = !SET_OPEN; renderMenu(); };
+  $('m-opt-panel').classList.toggle('hidden', !SET_OPEN);
+  $('m-opt-sh').textContent = tr('setScope', modeName(s.modes[0]));
+  // 设置项：用不上的项不隐藏，直接置灰不可点（并在 title 里说明原因）
+  const optDefs = {
+    showZh:       {label:()=>tr('optShowZh'),   title:()=>tr('optShowZhT')},
+    hideInf:      {label:()=>tr('optHideInf'),  title:()=>tr('optHideInfT')},
+    strictAccent: {label:()=>tr('optStrict'),   title:()=>tr('optStrictT')},
+    askTense:     {label:()=>tr('optAskTense'), title:()=>tr('optAskTenseT')},
+    type:         {label:()=>tr(s.inputMode==='type' ? 'typeType' : 'typeChoice'), title:()=>tr('optTypeT')},
+    vosotros:     {label:()=>tr('optVosotros'), title:()=>tr('optVosotrosT')},
+    onlyWrong:    {label:()=>tr('optOnlyWrong'),title:()=>tr('optOnlyWrongT')},
+  };
+  const OPT_ORDER = ['showZh','hideInf','strictAccent','askTense','type','vosotros','onlyWrong'];
+  const oBox = $('m-opts'); oBox.innerHTML='';
+  OPT_ORDER.forEach(k=>{
+    const d = optDefs[k];
+    const usable = optUsable(k, s.modes[0]);
+    const b = document.createElement('button');
+    const on = (k==='type' ? s.inputMode==='type' : !!s[k]) && usable;
+    b.className='chip sm' + (usable ? '' : ' off'); b.dataset.opt = k;
+    b.setAttribute('aria-pressed', on);
+    b.disabled = !usable;
+    b.textContent = d.label();
+    b.title = usable ? d.title() : tr('optOff');
+    b.onclick = ()=>{
+      if(!usable) return;
+      if(k==='type') s.inputMode = s.inputMode==='type' ? 'choice' : 'type';
+      else s[k] = !s[k];
+      saveDB(); renderMenu();
+    };
+    oBox.appendChild(b);
+  });
+  // 说明「隐藏原形」的生效范围：辨认 / 转换 / 平移模式生效，复现模式必须看到原形
+  {
+    const off = s.modes[0] === 'produce';
+    $('m-opt-hint').innerHTML = !s.hideInf
+      ? tr('hideInfOff')
+      : (off ? tr('hideInfOnNone') : tr('hideInfOn'))
+        + (s.showZh && !off ? tr('hideInfZhWarn') : '');
+  }
+
+  // ---- 4 · 时态：2×2 语式网格（第一行 陈述式 / 条件式，第二行 虚拟式 / 命令式），
+  // 每个语式框内部「上层简单时态、下层复合时态」，完全自由多选 ----
+  const tBox = $('m-tenses'); tBox.innerHTML='';
+  const tgs = document.createElement('div');
+  tgs.className = 'tgs';
+  TENSE_GROUPS.forEach(gp=>{
+    const inG = TENSES.filter(t => t.g === gp.k);
+    const onN = inG.filter(t => s.tenses.includes(t.k)).length;
+    const wrap = document.createElement('div');
+    wrap.className = 'tgroup g-' + gp.k;
+    const head = document.createElement('div');
+    head.className = 'tgroup-h';
+    head.innerHTML = '<span class="nm" title="'+esc(gName(gp.k) + ' · ' + (lang()==='en'?gp.ehint:gp.hint))+'">'
+      + gName(gp.k)+'</span><span class="es">'+gp.es+'</span>';
+    const act = document.createElement('div');
+    act.className = 'act';
+    const badge = document.createElement('span');
+    badge.className = 'n' + (onN === inG.length ? ' full' : '');
+    badge.textContent = onN + ' / ' + inG.length;
+    act.appendChild(badge);
+    const bAll = document.createElement('button');
+    bAll.textContent = tr('groupAll');
+    /* 按钮文案在窄列里已精简成「全选 / 清空」，完整含义放进 title / aria-label */
+    bAll.title = gName(gp.k) + ' · ' + tr('groupAll') + ' (' + inG.length + ')';
+    bAll.setAttribute('aria-label', gName(gp.k) + ' · ' + tr('groupAll'));
+    bAll.onclick = ()=>{ inG.forEach(t=>{ if(!s.tenses.includes(t.k)) s.tenses.push(t.k); }); syncTenseOrder(); saveDB(); renderMenu(); };
+    const bNone = document.createElement('button');
+    bNone.textContent = tr('groupNone');
+    bNone.title = gName(gp.k) + ' · ' + tr('groupNone');
+    bNone.setAttribute('aria-label', gName(gp.k) + ' · ' + tr('groupNone'));
+    bNone.onclick = ()=>{ s.tenses = s.tenses.filter(k => !inG.some(t=>t.k===k)); saveDB(); renderMenu(); };
+    act.appendChild(bAll); act.appendChild(bNone);
+    head.appendChild(act);
+    wrap.appendChild(head);
+
+    // 组内两层：上层简单 / 下层复合
+    wrap.appendChild(tenseRows(inG, t => {
+      const b = document.createElement('button');
+      b.className = 'chip sm tint g-' + t.g;
+      b.dataset.tense = t.k;
+      b.setAttribute('aria-pressed', s.tenses.includes(t.k));
+      b.textContent = tName(t.k);
+      b.title = tEs(t.k) + ' · ' + gName(t.g)
+              + (t.cp ? ' · '+tr('compoundT') : ' · '+tr('simpleT')) + ' · ' + t.lv
+              + (s.modes[0]==='transfer' ? tr('tenseXfer') : '');
+      b.onclick = ()=>{
+        const i = s.tenses.indexOf(t.k);
+        if(i>-1) s.tenses.splice(i,1); else s.tenses.push(t.k);
+        syncTenseOrder(); saveDB(); renderMenu();
+      };
+      return b;
+    }));
+    tgs.appendChild(wrap);
+  });
+  tBox.appendChild(tgs);
+  // 时态工具按钮（全选 / 清空）
+  const allowedKeys = ALL_TENSE_KEYS.slice();
+  $('m-t-all').onclick = ()=>{ s.tenses = allowedKeys.slice(); saveDB(); renderMenu(); };
+  $('m-t-none').onclick = ()=>{ s.tenses = []; saveDB(); renderMenu(); };
+  /* 「推荐时态组」固定成 A1 / A2 / B1 / B2 四个键，不跟随上方难度选择变化：
+     点哪个键就套用那个等级的时态组，按下的键高亮。 */
+  const recBox = $('m-t-recs'); recBox.innerHTML = '';
+  const recLabel = document.createElement('span');
+  recLabel.className = 'meta';
+  recLabel.textContent = tr('tRec');
+  recBox.appendChild(recLabel);
+  TENSE_RECS.forEach(lv=>{
+    const set = (LV_TENSE[lv] || []).filter(k => allowedKeys.indexOf(k) > -1);
+    const b = document.createElement('button');
+    b.className = 'chip sm'; b.dataset.rec = lv;
+    /* 高亮条件：当前时态选择正好等于该等级的时态组 */
+    const same = s.tenses.length === set.length && set.every(k => s.tenses.includes(k));
+    b.setAttribute('aria-pressed', same);
+    b.textContent = lv;
+    b.title = tr('tRecT', lv, set.length);
+    b.onclick = ()=>{ s.tenses = set.slice(); syncTenseOrder(); saveDB(); renderMenu(); };
+    recBox.appendChild(b);
+  });
+  const noTense = s.tenses.length === 0;
+  $('m-t-count').innerHTML = s.tenses.length
+      ? tr('tCount', s.tenses.length, allowedKeys.length)
+      : tr('tCountNone');
+
+  // ---- 词池 ----
+  const pool = buildPool();
+  const warns = [];
+  if(s.modes[0] === 'shift' && s.tenses.length === 1)   warns.push(tr('warnShift'));
+  if(s.modes[0] === 'transfer' && pool.length < 2)      warns.push(tr('warnTransfer'));
+  const warn = warns.length ? tr('warnTail', warns.join(lang()==='en' ? ', ' : '、')) : '';
+  $('m-pool').innerHTML = noTense
+      ? tr('poolNoTense')
+      : (tr('pool', pool.length, s.tenses.length) + (s.onlyWrong ? tr('poolWrong') : '') + warn);
+  $('m-start').disabled = pool.length===0 || noTense;
+  $('m-start').textContent = noTense ? tr('startPick')
+      : (pool.length ? tr('start') : tr('startEmpty'));
+}
+function tagMatch(v, tag){
+  if(!tag) return true;
+  if(tag === '规则')   return !v.g.includes('不规则');
+  if(tag === '不规则') return v.g.includes('不规则');
+  return v.g.some(x => x.indexOf(tag) === 0);
+}
+/* 把已选时态按 TENSES 的固定顺序重排，并剔除失效键 */
+function syncTenseOrder(){
+  const s = DB.settings;
+  const set = new Set(s.tenses.filter(k => T[k]));
+  s.tenses = ALL_TENSE_KEYS.filter(k => set.has(k));
+}
+/* 菜单时态卡片用的「上简单 / 下复合」两层（比左右两列省空间） */
+function tenseRows(list, makeChip){
+  const box = document.createElement('div');
+  [[0, ()=>tr('simple')],[1, ()=>tr('compound')]].forEach(([cp,label])=>{
+    const items = (list || []).filter(t => !!t.cp === !!cp);
+    const row = document.createElement('div');
+    row.className = 'trow' + (cp ? ' cmp' : '');
+    const h = document.createElement('div');
+    h.className = 'th';
+    h.textContent = label();
+    row.appendChild(h);
+    if(items.length){
+      const chips = document.createElement('div');
+      chips.className = 'chips';
+      items.forEach(t => chips.appendChild(makeChip(t)));
+      row.appendChild(chips);
+    } else {
+      const none = document.createElement('div');
+      none.className = 'none';
+      none.textContent = '—';
+      row.appendChild(none);
+    }
+    box.appendChild(row);
+  });
+  return box;
+}
+/* 「左简单 / 右复合」两列布局：辨认模式的时态选项框与变位表用 */
+function tenseColumns(list, makeChip, has, onlyCp){
+  const grid = document.createElement('div');
+  const single = (onlyCp === 0 || onlyCp === 1);
+  grid.className = 'tgrid' + (single ? ' one' : '');
+  (single ? [[onlyCp, ()=>tr(onlyCp ? 'compoundT' : 'simpleT')]]
+          : [[0, ()=>tr('simpleT')],[1, ()=>tr('compoundT')]]).forEach(([cp,label])=>{
+    const items = (list || []).filter(t => !!t.cp === !!cp && (!has || has(t.k)));
+    const col = document.createElement('div');
+    col.className = 'tcol' + (cp ? ' cmp' : '');
+    const h = document.createElement('div');
+    h.className = 'tcol-h' + (items.length ? '' : ' empty');
+    h.textContent = label();
+    col.appendChild(h);
+    if(items.length){
+      const chips = document.createElement('div');
+      chips.className = 'chips';
+      items.forEach(t => chips.appendChild(makeChip(t)));
+      col.appendChild(chips);
+    } else {
+      const none = document.createElement('div');
+      none.className = 'none';
+      none.textContent = '—';
+      col.appendChild(none);
+    }
+    grid.appendChild(col);
+  });
+  return grid;
+}
+function buildPool(){
+  const s = DB.settings;
+  let list = VERBS.filter(v => s.levels.includes(v.l));
+  list = list.filter(v => s.tenses.some(k => forms(v,k)));
+  if(s.tagFilter) list = list.filter(v => tagMatch(v, s.tagFilter));
+  if(s.onlyWrong){
+    const w = DB.stats.verbs;
+    const wrongList = list.filter(v => w[v.i] && w[v.i].err > 0);
+    if(wrongList.length) list = wrongList;
+  }
+  return list;
+}
+
+/* ============================================================
+   出题
+   ============================================================ */
+let SESS = {history:[], cur:-1, right:0, done:0, recent:[]};
+
+function weightOf(v){
+  const st = DB.stats.verbs[v.i];
+  if(!st || !st.att) return 1;
+  const rate = st.err / st.att;
+  return 1 + 3*rate + Math.min(st.err,6)*0.25;
+}
+function pickVerb(pool){
+  let total = 0; const w = pool.map(v => { const x = weightOf(v); total += x; return x; });
+  let r = Math.random()*total;
+  for(let i=0;i<pool.length;i++){ r -= w[i]; if(r<=0) return pool[i]; }
+  return pool[pool.length-1];
+}
+function validPersons(k){ return k==='ia' || k==='in' ? [1,2,3,4,5] : [0,1,2,3,4,5]; }
+function tensePoolOf(v){
+  const s = DB.settings;
+  return s.tenses.filter(k => { const f = forms(v,k); return f && f.some(x=>x); });
+}
+function makeQuestion(){
+  const s = DB.settings;
+  const pool = buildPool();
+  if(!pool.length) return null;
+  for(let attempt=0; attempt<400; attempt++){
+    const v = pickVerb(pool);
+    const tp = tensePoolOf(v);
+    if(!tp.length) continue;
+    /* 时态转换需要至少 2 个时态；平移模式需要题库里至少 2 个动词。否则退回其他模式 */
+    let modes = s.modes.filter(m => (m !== 'shift' || tp.length >= 2)
+                                 && (m !== 'transfer' || pool.length >= 2));
+    if(!modes.length) modes = ['produce'];
+    const q = {inf:v.i, idx:VERBS.indexOf(v), zh:v.z, g:v.g, lv:v.l,
+               mode: pick(modes), tense: pick(tp), userAnswer:null, correct:null};
+    const f = forms(v, q.tense);
+    const ps = askedPersons(q.tense).filter(i => f[i] && f[i].trim());
+    if(!ps.length) continue;
+    q.person = pick(ps);
+    q.answer = f[q.person];
+    if(q.mode === 'recognize') q.hits = formHits(v, q.answer);
+    if(q.mode === 'shift'){
+      const others = tp.filter(k => k!==q.tense);
+      if(!others.length) continue;
+      q.tense2 = pick(others);
+      const f2 = forms(v, q.tense2);
+      if(!f2 || !f2[q.person] || !f2[q.person].trim()) continue;
+      q.answer2 = f2[q.person];
+      /* 平移后与原形式完全同形（如 nosotros 的 compramos 在现在时/简单过去时一致）
+         这种题「换了个时态却什么都没变」，前 320 次尝试先避开；实在出不来再允许 */
+      if(norm(q.answer2) === norm(q.answer) && attempt < 320) continue;
+    }
+    if(q.mode === 'transfer'){
+      /* A 动词：已知人称时态与变位形式；B 动词：只给原形，要求写出同一人称时态的变位 */
+      const others = pool.filter(x => x !== v);
+      if(!others.length) continue;
+      const w = pick(others);
+      const f2 = forms(w, q.tense);
+      if(!f2 || !f2[q.person] || !f2[q.person].trim()) continue;
+      /* B 动词必须真的有这个时态的形式，否则「平移」会变成无解题 */
+      if(!tensePoolOf(w).includes(q.tense)) continue;
+      const a2 = f2[q.person];
+      /* A、B 在这个人称时态上同形（罕见到几乎不会发生）就没有练习价值 */
+      if(norm(a2) === norm(q.answer) && attempt < 320) continue;
+      q.srcInf = v.i; q.srcZh = v.z; q.srcForm = q.answer;
+      q.idx  = VERBS.indexOf(w);      /* 本题要变位的动词是 B */
+      q.inf  = w.i; q.zh = w.z; q.g = w.g; q.lv = w.l;
+      q.answer = a2;
+      /* A 出示的这个形式，在「同一个人称」下往往还有别的时态读法
+         （dormir 的 nosotros: dormimos 既是现在时也是简单过去时；
+          entregar 的 él: entregue 既是虚拟式现在时也是肯定命令式 usted）。
+         此时题目给出的时态其实是欠定的 —— 只要 B 在那些读法下的形式也一并接受，
+         用户就不会因为「按另一种同样成立的读法作答」而被判错。 */
+      q.srcAlts = uniq(formHits(v, q.srcForm)
+                         .filter(h => h.p === q.person && h.k !== q.tense)
+                         .map(h => h.k));
+      const extra = [];
+      q.srcAlts.forEach(k=>{
+        const fk = forms(w, k);
+        if(fk && fk[q.person] && fk[q.person].trim() && norm(fk[q.person]) !== norm(a2))
+          extra.push(fk[q.person]);
+      });
+      q.answersAlt = uniq(extra);
+    }
+    const key = q.inf+'|'+q.mode+'|'+q.tense+'|'+(q.tense2||'')+'|'+q.person+(q.srcInf?'|'+q.srcInf:'');
+    if(SESS.recent.includes(key)) continue;
+    SESS.recent.push(key); if(SESS.recent.length>24) SESS.recent.shift();
+    q.key = key;
+    if(q.mode==='recognize' && s.askTense){ q.pickPerson = null; q.pickTense = null; }
+    else if(q.mode==='recognize'){ q.pickPerson = null; }
+    if(s.inputMode==='choice' && q.mode!=='recognize') q.options = buildOptions(q, VERBS[q.idx]);
+    return q;
+  }
+  return null;
+}
+/* 辨认模式的时态选项框：只列与本题同类（简单 / 复合）的时态 */
+function recognizeTenseChips(v, onlyCp){
+  const avail = TENSES.filter(x => forms(v, x.k) && (x.cp ? 1 : 0) === onlyCp);
+  const out = [];
+  TENSE_GROUPS.forEach(gp=>{
+    avail.filter(x => x.g === gp.k).forEach(x => out.push(x.k));
+  });
+  return {avail, out};
+}
+function buildOptions(q, v){
+  /* 只选一个 mode 后干扰项不必再跨时态凑数：
+     ① 转换模式（同动词换时态）用目标时态的其他必问人称
+     ② 其余模式用同一个动词的其他必问人称；不够 4 个再补其他时态同人称 */
+  const set = new Set(); const out = [];
+  const tKey = q.mode==='shift' ? q.tense2 : q.tense;
+  out.push(q.answer); set.add(norm(q.answer));          // 选项里始终保留正确答案
+  /* 平移模式里「同样算对」的备选形式不能拿来当干扰项，否则会出现两个正确答案 */
+  if(q.answersAlt) q.answersAlt.forEach(x => set.add(norm(x)));
+  /* 本题的「必问人称」（第 6 人称被设置过滤掉时不再算入） */
+  const asked = validPersons(tKey).filter(i => DB.settings.vosotros || i !== 4);
+  const f0 = forms(v, q.tense);
+  /* 转换模式同时问「原时态」那一栏的答案，所以两个时态的形式都要在里面 */
+  if(q.mode === 'shift' && q.answer2 !== q.answer){ out.push(q.answer2); set.add(norm(q.answer2)); }
+  const f = forms(v, tKey);
+  const others = asked.filter(i => i!==q.person && f[i] && f[i].trim());
+  for(let i=0;i<8 && out.length<4 && others.length;i++){
+    const x = f[others.splice(rnd(others.length),1)[0]];
+    if(!set.has(norm(x))){ out.push(x); set.add(norm(x)); }
+  }
+  /* 该时态变位变体太少（如否定命令式的单数人称）时，补「其他时态同人称」的形式凑满 4 个 */
+  const tp = tensePoolOf(v).filter(k => k!==q.tense && k!==q.tense2);
+  for(let i=0;i<10 && out.length<4 && tp.length;i++){
+    const k = tp.splice(rnd(tp.length),1)[0];
+    const ff = forms(v,k);
+    if(ff && ff[q.person] && ff[q.person].trim() && !set.has(norm(ff[q.person]))){
+      out.push(ff[q.person]); set.add(norm(ff[q.person]));
+    }
+  }
+  /* 仍是 3 个（人称实在不够）就补「原时态其他必问人称」，保证选择题有 4 个选项 */
+  if(out.length < 4 && f0){
+    const rest = asked.filter(i => i!==q.person && f0[i] && f0[i].trim()
+                               && !set.has(norm(f0[i])));
+    for(let i=0;i<4 && out.length<4 && rest.length;i++){
+      const x = f0[rest.splice(rnd(rest.length),1)[0]];
+      if(!set.has(norm(x))){ out.push(x); set.add(norm(x)); }
+    }
+  }
+  return out;
+}
+
+/* ============================================================
+   渲染练习
+   ============================================================ */
+/* 把「隐藏原形」的那个按钮换成原形本身（点「看原形」或作答后调用）；
+   只清掉 p-mask 这个 id 与类名（「掩码是否已消失」就是查它），
+   外层的 .inf-line 壳原样留着 —— 两种状态共用同一个固定高度，
+   所以揭示前后题干高度不变，下面的选项网格不会上下跳 */
+function revealInf(inf){
+  const box = $('p-mask');
+  if(!box) return;
+  box.id = ''; box.className = '';
+  box.innerHTML = '<div class="verb-mid">'+esc(inf)+'</div>';
+}
+function renderPractice(){
+  const q = SESS.history[SESS.cur];
+  const wrap = $('p-body');
+  $('p-progress').innerHTML = tr('progress', SESS.cur+1, SESS.history.length,
+                                 (SESS.done? Math.round(SESS.right/SESS.done*100) : 0));
+  $('p-prev').disabled = SESS.cur <= 0;
+  $('p-zh').textContent = DB.settings.showZh ? tr('zhOn') : tr('zhOff');
+  $('p-zh').style.color = DB.settings.showZh ? 'var(--accent)' : '';
+  /* 「不看原形」只在菜单的设置面板里改 */
+  if(!q){ wrap.innerHTML = '<div class="card center">'+esc(tr('emptyPoolAlert'))+'</div>'; return; }
+
+  const v = VERBS[q.idx];
+  const t = T[q.tense];
+  /* 中文释义行始终占住一格高度（关掉时只是隐形），开关时下方内容不移动 */
+  const zhLine = '<div class="zh zh-line' + (DB.settings.showZh ? '' : ' off') + '">'
+      + esc(meaningOf(v)) + '</div>';
+  /* 隐藏原形只在辨认 / 转换 / 平移模式且本题未作答时生效，作答后自动显示方便复盘；
+     本题内点过「看原形」（q.peeked）就保持显示，重绘也不会再盖回去 */
+  const hideInfOn = !!DB.settings.hideInf && q.mode !== 'produce' && q.correct === null && !q.peeked;
+  /* 显示原形 与「隐藏成一个按钮」两种状态共用 .inf-line 这层固定高度的壳；
+     隐藏态整行就是那个按钮本身（不再有 ? ? ? 占位），所以点击前后高度一致 */
+  const infLine = '<div class="inf-line">' + (hideInfOn
+      ? '<div class="inf-mask" id="p-mask">'
+        + '<button class="btn peek" id="p-peek" title="'+esc(tr('peekT'))+'">'+esc(tr('peek'))+'</button></div>'
+      : '<div class="verb-mid">'+esc(q.inf)+'</div>') + '</div>';
+  const tagLine = q.g.length ? '<div style="margin-top:6px">'+q.g.map(x=>'<span class="tag '+
+      (x==='不规则'||x==='不规则分词'?'bad':(x.indexOf('词干')===0?'warn':(x==='高频'?'acc':'')))+'">'
+      +esc(tagName(x))+'</span>').join('')+'</div>' : '';
+  let head = '', body = '', hint = '';
+
+  if(q.mode==='recognize'){
+    head = '<div class="meta">'+esc(tr('mz').recognize)+'</div>';
+    body = '<div class="qbox">'
+        + infLine + zhLine
+        + '<div class="verb-big" style="margin:10px 0 4px">'+esc(q.answer)+'</div>'
+        + '</div>';
+    /* 人称选项：第一行单数、第二行复数，一行三个人称；窄屏自动换成短标签
+       命令式没有 yo，只出 5 个人称，且用 usted / ustedes 而非 él / ella / ellos */
+    const imp = isImp(q.tense);
+    const mkOpt = i => '<button class="opt" data-pick="'+i+'" title="'+esc(personLabel(i,q.tense)+' · '+personOrdI(i,q.tense))+'">'
+        + '<span class="pol"><span class="w">'+esc(personLabel(i,q.tense))+'</span>'
+        + '<span class="s">'+esc(personShort(i,q.tense))+'</span></span>'
+        + '<small>'+esc(personGlossI(i,q.tense))+'</small></button>';
+    const row1 = imp ? [1,2,3] : PERS_ROW1;   // 命令式：tú / usted / nosotros
+    const row2 = imp ? [4,5]   : PERS_ROW2;   // 命令式：vosotros / ustedes
+    body += '<div class="opts persons" id="p-persons">'
+        + '<div class="orow">'+row1.map(mkOpt).join('')+'</div>'
+        + '<div class="orow">'+row2.map(mkOpt).join('')+'</div>'
+        + '</div>';
+    if(DB.settings.askTense){
+      body += '<div class="tpick" id="p-tenses"></div>';
+    }
+    hint = (hideInfOn ? tr('hRecHide') : '')
+         + tr('hRec') + tr(t.cp ? 'compoundT' : 'simpleT') + tr('hRec2') + tr('hRec3');
+  }
+  else if(q.mode==='produce'){
+    head = '<div class="meta">'+esc(tr('mz').produce)+'</div>';
+    /* 时态名里已含语式时（如「虚拟式现在时」「肯定命令式」）不再重复标注 */
+    const moodTag = tName(q.tense).indexOf(gName(t.g)) > -1 ? '' : '<span class="pill grey">'+esc(gName(t.g))+'</span>';
+    body = '<div class="qbox">'
+        + infLine + zhLine
+        + '<div class="row" style="justify-content:center;margin-top:10px">'
+        + '<span class="pill g-'+t.g+'">'+esc(tName(q.tense))+'</span>'+moodTag+'</div>'
+        + '<div class="hint" style="margin-top:8px">'+esc(t.es)+(q.tense==='ia'||q.tense==='in'?' · '+IMP_LABEL[q.person]:'')+'</div>'
+        + (q.tense==='in' ? '<div class="hint" style="margin-top:4px">'+esc(tr('negImp'))+'</div>' : '')
+        + '</div>';
+    body += answerArea(q);
+    hint = tr('hProduce') + (isRefl(q.inf) ? ' ' + tr('hRefl') : '');
+  }
+  else if(q.mode==='shift'){
+    const t2 = T[q.tense2];
+    head = '<div class="meta">'+esc(tr('mz').shift)+'</div>';
+    body = '<div class="qbox">'
+        + infLine + zhLine
+        + '<table style="margin:10px auto 0;max-width:440px">'
+        + '<tr><th></th><th>'+esc(tr('sSrc'))+'</th><th>'+esc(tr('sTgt'))+'</th></tr>'
+        + '<tr><td class="meta">'+esc(tr('sMood'))+'</td><td class="c-gi g-'+t.g+'">'+esc(gName(t.g))+'</td>'
+        + '<td class="c-gi g-'+t2.g+'">'+esc(gName(t2.g))+'</td></tr>'
+        + '<tr><td class="meta">'+esc(tr('sTense'))+'</td><td class="c-gi g-'+t.g+'">'+esc(tName(q.tense))+'</td>'
+        + '<td class="g-'+t2.g+'"><b class="c-g">'+esc(tName(q.tense2))+'</b></td></tr>'
+        + '<tr><td class="meta">'+esc(tr('sForm'))+'</td><td><b>'+esc(q.answer)+'</b></td><td class="meta">?</td></tr>'
+        + '</table></div>';
+    body += answerArea(q);
+    hint = (t.g === t2.g)
+        ? tr('hShiftSame')
+        : tr('hShiftCross', gName(t.g), gName(t2.g));
+    if(hideInfOn) hint = tr('hShiftHide') + hint;
+    if(isRefl(q.inf)) hint += ' ' + tr('hRefl');
+  }
+  else {   /* transfer · 平移模式：人称时态不变，只换动词 */
+    head = '<div class="meta">'+esc(tr('mz').transfer)+'</div>';
+    body = '<div class="qbox">'
+        + '<div class="row" style="justify-content:center;margin-top:4px">'
+        + '<span class="pill g-'+t.g+'">'+esc(tName(q.tense))+'</span>'
+        + '<span class="pill grey">'+esc(t.es)+'</span></div>'
+        + '<div class="xfer">'
+        +   '<div class="xrow a"><span class="xlab">A</span>'
+        +     '<div class="xverb"><b>'+esc(q.srcInf)+'</b>'
+        +       '<span class="zh">'+esc(meaningOf(byInf[q.srcInf]))+'</span></div>'
+        +     '<div class="xform">'+esc(q.srcForm)+'</div></div>'
+        +   '<div class="xrow b"><span class="xlab">B</span>'
+        +     '<div class="xverb"><b>'+esc(q.inf)+'</b>'
+        +       '<span class="zh">'+esc(meaningOf(v))+'</span></div>'
+        +     '<div class="xform">?</div></div>'
+        + '</div>'
+        + '<div class="hint" style="margin-top:9px">'+esc(tr('transferHint'))+'</div>'
+        + '</div>';
+    body += answerArea(q);
+    hint = tr('hTransfer') + (isRefl(q.inf) ? ' ' + tr('hRefl') : '');
+  }
+  body += '<div class="field"><div class="row tight"><button class="btn primary" id="p-go">'+esc(tr('check'))+'</button>'
+      + '<span class="hint" id="p-tip">'+hint+'</span></div></div><div id="p-feedback"></div>';
+
+  wrap.innerHTML = '<div class="card">'+head+tagLine+body+'</div>';
+
+  /* 「看原形」：只在本题内揭示原形，不改变判定；换题后恢复隐藏。
+     在题目上记一笔 peeked，这样即使整屏重绘（切语言、改设置）也不会又盖回 ? ? ? */
+  const peek = $('p-peek');
+  if(peek) peek.onclick = ()=>{ q.peeked = true; revealInf(q.inf); };
+
+  // 辨认模式：时态选项框
+  // 只列与本题同类（简单 / 复合）的时态，否则同类时态一行放不下
+  if(q.mode==='recognize' && DB.settings.askTense){
+    const host = $('p-tenses');
+    const onlyCp = t.cp ? 1 : 0;                       // 本题属于简单时态还是复合时态
+    const avail = TENSES.filter(x => forms(v, x.k) && (x.cp ? 1 : 0) === onlyCp);
+    host.innerHTML = '<div class="fh">'+esc(tr('tenseQ'))
+      + '<span class="note">'+esc(tr('tenseQOnly', tr(onlyCp ? 'compoundT' : 'simpleT')))+'</span></div>';
+    const mkChip = x => {
+      const b = document.createElement('button');
+      b.className = 'chip sm tint g-' + x.g;
+      b.dataset.tense = x.k;
+      b.textContent = tName(x.k);
+      b.title = x.es + ' · ' + tr(x.cp ? 'compoundT' : 'simpleT');
+      return b;
+    };
+    /* 每题只出一种时态类别，同类时态数量少，所以一行放两个语式组：
+       陈述式 + 条件式在第一行，虚拟式 + 命令式在第二行，比逐组堆叠紧凑得多 */
+    const rows = [TENSE_GROUPS.slice(0, 2), TENSE_GROUPS.slice(2)];
+    rows.forEach(rowGroups=>{
+      const row = document.createElement('div');
+      row.className = 'tpick-row';
+      rowGroups.forEach(gp=>{
+        const inG = avail.filter(x => x.g === gp.k);
+        if(!inG.length) return;
+        const box = document.createElement('div');
+        box.className = 'tpick-g g-' + gp.k;
+        const gh = document.createElement('div');
+        gh.className = 'tpick-h';
+        gh.innerHTML = esc(gName(gp.k)) + '<span class="es">'+esc(gp.es)+'</span>';
+        box.appendChild(gh);
+        box.appendChild(tenseColumns(inG, mkChip, null, onlyCp));
+        row.appendChild(box);
+      });
+      if(row.children.length) host.appendChild(row);
+    });
+  }
+
+  let selP = q.pickPerson, selT = q.pickTense;
+  const answerLocked = q.correct !== null;
+  const goBtn = $('p-go');
+  const upd = ()=>{
+    if(q.mode==='recognize'){
+      const can = selP !== null && (!DB.settings.askTense || selT !== null);
+      goBtn.disabled = !can && !answerLocked;
+      document.querySelectorAll('#p-persons .opt').forEach((b,i)=>b.classList.toggle('sel', i===selP));
+      document.querySelectorAll('#p-tenses .chip').forEach(b=>b.setAttribute('aria-pressed', b.dataset.tense===selT));
+    } else if(DB.settings.inputMode==='choice'){
+      goBtn.disabled = !q.pickChoice && !answerLocked;
+      document.querySelectorAll('#p-choices .opt').forEach(b=>b.classList.toggle('sel', b.dataset.v===q.pickChoice));
+    }
+  };
+  if(q.mode==='recognize'){
+    document.querySelectorAll('#p-persons .opt').forEach(b=>{
+      b.onclick = ()=>{ if(answerLocked) return; selP = +b.dataset.pick; q.pickPerson = selP; upd(); };
+    });
+    document.querySelectorAll('#p-tenses .chip').forEach(b=>{
+      b.onclick = ()=>{ if(answerLocked) return; selT = b.dataset.tense; q.pickTense = selT; upd(); };
+    });
+    upd();
+    if(answerLocked){   // 回看已答题目：标出对错（同形的读法都算对)
+      const hits = q.hits || (q.hits = formHits(v, q.answer));
+      const okP = new Set(hits.map(x=>x.p));
+      const okK = new Set(hits.map(x=>x.k));
+      document.querySelectorAll('#p-persons .opt').forEach((b,i)=>{
+        if(okP.has(i)) b.classList.add('rev-ok');
+        else if(i === q.pickPerson) b.classList.add('rev-bad');
+        if(i === q.pickPerson) b.classList.remove('sel');
+      });
+      document.querySelectorAll('#p-tenses .chip').forEach(b=>{
+        const k = b.dataset.tense;
+        if(k === q.pickTense) b.classList.remove('sel');
+        if(okK.has(k)) b.classList.add('rev-ok');
+        else if(k === q.pickTense) b.classList.add('rev-bad');
+        b.setAttribute('aria-pressed', k === q.pickTense);
+      });
+    }
+  } else if(DB.settings.inputMode==='type'){
+    const inp = $('p-input');
+    if(inp){
+      if(answerLocked){ inp.value = q.userAnswer || ''; inp.disabled = true; }
+      else inp.focus();
+    }
+  } else {
+    document.querySelectorAll('#p-choices .opt').forEach(b=>{
+      b.onclick = ()=>{ if(answerLocked) return; q.pickChoice = b.dataset.v; upd(); };
+    });
+    upd();
+    if(answerLocked){
+      document.querySelectorAll('#p-choices .opt').forEach(b=>{
+        const ans = q.mode==='shift' ? q.answer2 : q.answer;
+        if(b.dataset.v === ans) b.classList.add('rev-ok');
+        else if(b.dataset.v === q.pickChoice) b.classList.add('rev-bad');
+        b.classList.remove('sel');
+      });
+    }
+  }
+
+  /* 按钮状态实时判断：未作答→提交；已作答→下一题 */
+  goBtn.onclick = ()=>{
+    const cur = SESS.history[SESS.cur];
+    if(cur && cur.correct !== null) nextQuestion(); else submitAnswer();
+  };
+  /* 键盘只留这一个入口（挂在 document 上）。
+     原先 #p-body 上还挂了一个 wrap.onkeydown：同一个 Enter 先被它提交答案，
+     事件冒泡到 document 后又被当成「已作答 → 下一题」，所以刚敲完答案就跳题、
+     看不到对错。现在一次 Enter 只做一件事：未作答=提交，已作答=下一题。 */
+  document.onkeydown = e => {
+    if($('scr-practice').classList.contains('hidden')) return;
+    const cur = SESS.history[SESS.cur];
+    if(e.key==='Enter'){
+      e.preventDefault();
+      const b = $('p-go');
+      if(b && !b.disabled) b.click();
+      return;
+    }
+    if(cur && cur.mode==='recognize' && cur.correct===null && e.key>='1' && e.key<='6'){
+      const b = document.querySelectorAll('#p-persons .opt')[+e.key-1]; if(b) b.click();
+    }
+  };
+
+  if(answerLocked) showFeedback(q, true);
+}
+/* 多主语人称（él/ella/usted…）每题随机显示一个，只需认出人称，不并列三个代词；
+   命令式每格只对应一个代词（usted / ustedes…），不再出现 él / ella / ellos */
+function subjectOf(q){
+  if(!q.subj){
+    const list = personPro(q.person, qTense(q));
+    q.subj = list[rnd(list.length)];
+  }
+  return q.subj;
+}
+/* 主语提示只给西语代词：中文 / 英文释义一律不显示（完整人称说明放在 title 里） */
+function subjectCue(q){
+  const k = qTense(q);
+  return '<span class="pill dark subj" title="'+esc(personLabel(q.person,k) + ' · ' + personOrdI(q.person,k))+'">'
+       + '<span class="sp">'+esc(subjectOf(q))+'</span></span>';
+}
+function answerArea(q){
+  const subj = subjectCue(q);
+  if(DB.settings.inputMode==='type'){
+    return '<div class="field"><div class="ansrow">'+subj
+        + '<input type="text" id="p-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="'
+        + esc(tr('placeholder'))+'"></div></div>';
+  }
+  const arr = q.options;
+  return '<div class="row" style="margin-top:12px">'+subj+'</div>'
+       + '<div class="opts three" id="p-choices">' + arr.map(x =>
+      '<button class="opt" data-v="'+esc(x)+'">'+esc(x)+'</button>').join('') + '</div>';
+}
+function submitAnswer(){
+  const q = SESS.history[SESS.cur];
+  if(q.correct !== null) return;
+  const v = VERBS[q.idx];
+  let ok = false, soft = false, given = '';
+  if(q.mode==='recognize'){
+    const selP = q.pickPerson, selT = q.pickTense;
+    const askT = !!DB.settings.askTense;
+    if(selP === null) return;
+    if(askT && selT === null) return;
+    const hits = q.hits || (q.hits = formHits(v, q.answer));
+    /* 同形判定：所选人称/时态只要是这个形式的真实读法就算对
+       （compramos 既是现在时也是简单过去时；habla 既是现在时 él 也是肯定命令式 tú） */
+    const hp = hits.filter(x => x.p === selP);
+    q.personOK = hp.length > 0;
+    ok = askT ? hp.some(x => x.k === selT) : q.personOK;
+    if(askT) q.tenseOK = hp.some(x => x.k === selT);
+    given = PERSONS[selP].l + (askT ? ' · ' + tName(selT) : '');
+    q.altPersons = uniq(hits.map(x=>x.p)).sort((a,b)=>a-b);
+    q.altTenses = uniq(hits.map(x=>x.k));
+    q.personTenses = uniq(hp.map(x=>x.k));
+  } else if(q.mode==='produce'){
+    const inp = $('p-input');
+    given = inp ? inp.value : (q.pickChoice||'');
+    if(!given.trim()) return;
+    const r = judge(given, q.answer, DB.settings.strictAccent, q.tense);
+    ok = r.ok; soft = r.soft;
+  } else if(q.mode==='shift'){
+    const inp = $('p-input');
+    given = inp ? inp.value : (q.pickChoice||'');
+    if(!given.trim()) return;
+    const r = judge(given, q.answer2, DB.settings.strictAccent, q.tense2);
+    ok = r.ok; soft = r.soft;
+  } else {   /* transfer · 平移模式：判定 B 动词的变位 */
+    const inp = $('p-input');
+    given = inp ? inp.value : (q.pickChoice||'');
+    if(!given.trim()) return;
+    /* A 出示的形式若有多重读法，B 在那些读法下的形式同样接受（见 makeQuestion 里的说明） */
+    const r = judge(given, [q.answer].concat(q.answersAlt || []), DB.settings.strictAccent, q.tense);
+    ok = r.ok; soft = r.soft;
+    if(ok) q.altMatched = q.answersAlt.find(x => norm(x) === norm(cleanAnswer(given))) || null;
+  }
+  q.userAnswer = given; q.correct = ok; q.soft = soft; q.ansShown = (q.mode==='shift'? q.answer2 : q.answer);
+  SESS.done++; if(ok) SESS.right++;
+  recordAnswer(q);
+  showFeedback(q, false);
+  const btn = $('p-go'); btn.textContent = tr('next'); btn.disabled = false;
+  $('p-progress').innerHTML = tr('progress', SESS.cur+1, SESS.history.length,
+                                 Math.round(SESS.right/SESS.done*100));
+  const inp = $('p-input'); if(inp) inp.disabled = true;
+}
+function showFeedback(q, review){
+  const v = VERBS[q.idx];
+  const fb = $('p-feedback'); if(!fb) return;
+  const ans = q.ansShown || (q.mode==='shift' ? q.answer2 : q.answer);
+  const t = T[q.mode==='shift' ? q.tense2 : q.tense];
+  let cls = 'ok', mark = '✓', title = tr('ok');
+  if(!q.correct) { cls='bad'; mark='✗'; title=tr('bad'); }
+  else if(q.soft) { cls='warn'; mark='△'; title=tr('warn'); }
+  let html = '<div class="fb '+cls+'"><div class="head"><span class="mark">'+mark+'</span>'+title+'</div>';
+  if(q.mode==='recognize'){
+    const hits = q.hits || (q.hits = formHits(v, q.answer));
+    const tp = uniq(hits.map(x=>x.p)).sort((a,b)=>a-b);      // 这个形式可能的人称
+    const tk = uniq(hits.map(x=>x.k));                        // 这个形式可能的时态
+    const f = forms(v, q.tense);
+    const hitP = new Set(hits.filter(x=>x.k === q.tense).map(x=>x.p));
+    html += '<div style="margin-top:6px">'+tr('correctPerson')+'<b>'+tp.map(i=>personLabel(i, q.tense)).join(' / ')
+         + '</b>　'+tr('tenseIs')+'<b>'+tk.map(k=>'<span class="c-gi g-'+T[k].g+'">'+esc(tName(k))+'</span>').join(' / ')
+         + '</b>（'+tk.map(k=>T[k].es).join(' / ')+'）</div>';
+    /* 同形说明：人称歧义（hablaba = yo/él）或时态同形（compramos = 现在/简单过去） */
+    if(tp.length>1 || tk.length>1){
+      let why = tr('homoLead', esc(q.answer));
+      if(tk.length>1) why += tr('homoTense', tk.map(k=>tName(k)).join(' / '));
+      if(tp.length>1) why += (tk.length>1 ? (lang()==='en' ? ', ' : '，') : '')
+                            + tr('homoPers', tp.map(i=>personGlossI(i, q.tense)).join(' / '));
+      why += tr('homoTail');
+      html += '<div class="hint" style="margin-top:4px">'+why+'</div>';
+    }
+    if(!q.correct && DB.settings.askTense && q.personOK && q.tenseOK === false)
+      html += '<div class="hint" style="margin-top:4px">'
+           + tr('tenseWrong', personLabel(q.pickPerson, qTense(q)),
+                q.personTenses.length ? q.personTenses.map(k=>tName(k)).join(' / ') : tr('tenseWrongNoneP'),
+                tName(q.pickTense)) + '</div>';
+    if(q.pickPerson !== q.person || (DB.settings.askTense && q.pickTense && q.pickTense !== q.tense))
+      html += '<div class="hint" style="margin-top:4px">'
+           + tr('cameFrom', esc(tName(q.tense)) + ' · ' + personLabel(q.person, qTense(q))) + '</div>';
+    html += '<div class="hint" style="margin-top:6px">'+tr('gridLead')+'</div>';
+    html += personGrid(f, hitP, q.tense, codesOf(v, q.tense), false, hlOf(v, q.tense));
+  } else {
+    if(!review || q.userAnswer) html += '<div style="margin-top:6px">'+tr('yourAns')
+         + '<b>'+esc(q.userAnswer||tr('blank'))+'</b></div>';
+    html += '<div>'+tr('correctAns')+'<b style="font-size:18px">'+esc(ans)+'</b>';
+    if(q.tense==='si') html += ' <span class="hint">'+tr('alsoW', esc(siAlt(ans)))+'</span>';
+    html += '</div>';
+    if(q.mode==='shift'){
+      html += '<div class="hint" style="margin-top:4px">'
+           + esc(tr('shiftSame', q.inf, tName(q.tense), tName(q.tense2), personLabel(q.person, qTense(q))))+'</div>';
+      if(norm(q.answer2) === norm(q.answer))
+        html += '<div class="hint" style="margin-top:2px">'+esc(tr('shiftIdent', personGlossI(q.person, qTense(q))))+'</div>';
+    }
+    if(q.mode==='transfer'){
+      html += '<div class="hint" style="margin-top:4px">'
+           + tr('xferNote', esc(q.srcInf), esc(tName(q.tense)), personLabel(q.person, qTense(q)), esc(q.srcForm), esc(q.inf))
+           + '<b>'+esc(q.answer)+'</b>.</div>';
+      /* A 出示的形式本身还有别的时态读法时，说明「另一种读法也算对」 */
+      if(q.answersAlt && q.answersAlt.length)
+        html += '<div class="hint" style="margin-top:2px">'
+             + tr('xferAlt', esc(q.srcForm), (q.srcAlts||[]).map(k=>esc(tName(k))).join(' / '),
+                  q.answersAlt.map(x=>'<b>'+esc(x)+'</b>').join(' / '))+'</div>';
+    }
+    const f = forms(v, q.mode==='shift'? q.tense2 : q.tense);
+    if(f){
+      const tk = q.mode==='shift'? q.tense2 : q.tense;
+      html += '<div class="hint" style="margin-top:6px">'
+           + tr('gridLead2', esc(q.inf), esc(tName(tk)))+'</div>';
+      html += personGrid(f, new Set([q.person]), tk, codesOf(v, tk), false, hlOf(v, tk));
+    }
+  }
+  if(q.g.length) html += '<div style="margin-top:10px">'+q.g.map(x=>'<span class="tag">'+esc(tagName(x))+'</span>').join('')+'</div>';
+  /* 相关语法：跳到本程序里的讲解页 + 在右栏打开这个动词的变位表（不再跳到站外） */
+  const tkf = q.mode==='shift' ? q.tense2 : q.tense;
+  html += '<div class="glinks"><span class="lb">'+esc(tr('relGrammar'))+'</span>'
+       +  guideLinkBtn(TENSE_GUIDE[tkf])
+       +  '<button type="button" data-tbl="'+esc(q.inf)+'" data-tt="'+esc(tkf)+'" data-tp="'+q.person+'">'
+       +  esc(tr('tblBtn', q.inf))+'</button></div>';
+  html += '</div>';
+  fb.innerHTML = html;
+  document.querySelectorAll('#p-feedback [data-g]').forEach(b=>{
+    b.onclick = ()=> openGuide(b.dataset.g);
+  });
+  document.querySelectorAll('#p-feedback [data-tbl]').forEach(b=>{
+    b.onclick = ()=> openTable(b.dataset.tbl, {t:b.dataset.tt, p:+b.dataset.tp});
+  });
+  /* 隐藏原形时，作答后自动把原形放回题干，方便复盘 */
+  revealInf(q.inf);
+  $('p-go').textContent = tr('next');
+  const tip = $('p-tip'); if(tip) tip.textContent = tr('enterNext');
+}
+function nextQuestion(){
+  if(SESS.cur < SESS.history.length-1){ SESS.cur++; renderPractice(); return; }
+  const q = makeQuestion();
+  if(!q){ alert(tr('emptyNext')); return; }
+  SESS.history.push(q); SESS.cur = SESS.history.length-1;
+  renderPractice();
+}
+
+/* ============================================================
+   统计页
+   ============================================================ */
+function renderStats(){
+  const st = DB.stats;
+  const acc = st.total.att ? Math.round((1-st.total.err/st.total.att)*100) : 0;
+  let h = '<div class="card"><div class="stats-grid">'
+    + '<div><div class="stat-big">'+st.total.att+'</div><div class="stat-lbl">'+esc(tr('stAnswers'))+'</div></div>'
+    + '<div><div class="stat-big">'+acc+'%</div><div class="stat-lbl">'+esc(tr('stAcc'))+'</div></div>'
+    + '<div><div class="stat-big">'+st.total.err+'</div><div class="stat-lbl">'+esc(tr('stErr'))+'</div></div>'
+    + '<div><div class="stat-big">'+Object.keys(st.verbs).length+'</div><div class="stat-lbl">'+esc(tr('stVerbs'))+'</div></div>'
+    + '</div></div>';
+
+    const rows = Object.entries(st.verbs).map(([inf,d])=>{
+    const v = byInf[inf];
+    return {inf, zh: meaningOf(v), lv: v?v.l:'', att:d.att, err:d.err, rate:d.err/Math.max(d.att,1)};
+  }).filter(x=>x.err>0).sort((a,b)=> (b.err/Math.max(b.att,1)) - (a.err/Math.max(a.att,1)) || b.err-a.err).slice(0,20);
+  h += '<div class="card"><h2>'+esc(tr('stHardest'))+'</h2>';
+  if(!rows.length) h += '<p class="hint">'+esc(tr('stNoErr'))+'</p>';
+  else {
+    h += '<table><tr><th>'+esc(tr('thVerb'))+'</th><th>'+esc(tr('thMean'))+'</th><th>'+esc(tr('thLv'))
+       + '</th><th class="num">'+esc(tr('thErrAtt'))+'</th><th class="num">'+esc(tr('thRate'))+'</th><th></th></tr>';
+    rows.forEach(r=>{
+      const pc = Math.round(r.rate*100);
+      h += '<tr><td><b>'+esc(r.inf)+'</b></td><td class="meta">'+esc(r.zh)+'</td><td class="meta">'+r.lv+'</td>'
+        + '<td class="num">'+r.err+'/'+r.att+'</td><td class="num">'+pc+'%</td>'
+        + '<td><div class="bar"><i style="width:'+pc+'%"></i></div></td></tr>';
+    });
+    h += '</table>';
+  }
+  h += '</div>';
+
+    const trows = Object.entries(st.tenses).map(([k,d])=>({k, ...d, rate:d.err/Math.max(d.att,1)}))
+      .sort((a,b)=>b.rate-a.rate);
+  h += '<div class="card"><h2>'+esc(tr('stByTense'))+'</h2>';
+  if(!trows.length) h += '<p class="hint">'+esc(tr('stNoData'))+'</p>';
+  else{
+    h += '<table><tr><th>'+esc(tr('thTense'))+'</th><th class="num">'+esc(tr('thErrAtt'))
+       + '</th><th class="num">'+esc(tr('thRate'))+'</th><th></th></tr>';
+    trows.forEach(r=>{
+      const pc = Math.round(r.rate*100);
+      h += '<tr><td>'+(T[r.k]?esc(tName(r.k)):esc(r.k))+' <span class="meta">'+(T[r.k]?esc(T[r.k].es):'')+'</span></td>'
+        + '<td class="num">'+r.err+'/'+r.att+'</td><td class="num">'+pc+'%</td>'
+        + '<td><div class="bar"><i style="width:'+pc+'%"></i></div></td></tr>';
+    });
+    h += '</table>';
+  }
+  h += '</div>';
+
+    h += '<div class="card"><h2>'+esc(tr('stByMode'))+'</h2><table><tr><th>'+esc(tr('thMode'))+'</th>'
+     + '<th class="num">'+esc(tr('thOkAtt'))+'</th><th class="num">'+esc(tr('thAcc'))+'</th></tr>';
+  Object.entries(st.modes).forEach(([k,d])=>{
+    h += '<tr><td>'+esc(modeName(k))+'</td><td class="num">'+(d.att-d.err)+'/'+d.att+'</td><td class="num">'
+      + (d.att?Math.round((1-d.err/d.att)*100):0)+'%</td></tr>';
+  });
+  if(!Object.keys(st.modes).length) h += '<tr><td colspan="3" class="hint">'+esc(tr('stNoData2'))+'</td></tr>';
+  h += '</table></div>';
+
+    h += '<div class="card"><h2>'+esc(tr('stWrong'))+' <span class="meta">'
+     + esc(tr('stWrongN', Math.min(st.wrong.length,30)))+'</span></h2>';
+  if(!st.wrong.length) h += '<p class="hint">'+esc(tr('stNoWrong'))+'</p>';
+  else{
+    h += '<table><tr><th>'+esc(tr('thVerb'))+'</th><th>'+esc(tr('thTense'))+'</th><th>'+esc(tr('thPerson'))
+       + '</th><th>'+esc(tr('thYou'))+'</th><th>'+esc(tr('thRight'))+'</th></tr>';
+    st.wrong.slice(0,30).forEach(w=>{
+      h += '<tr><td><b>'+esc(w.inf)+'</b></td><td class="meta">'+(T[w.tense]?esc(tName(w.tense)):esc(w.tense))+'</td>'
+        + '<td class="meta">'+esc(PERSONS[w.p]?PERSONS[w.p].l:'')+'</td>'
+        + '<td style="color:var(--bad)">'+esc(w.user||'—')+'</td><td style="color:var(--ok)">'+esc(w.ans)+'</td></tr>';
+    });
+    h += '</table>';
+  }
+  h += '</div>';
+
+    h += '<div class="card"><h2>'+esc(tr('stData'))+'</h2><p class="hint">'+esc(tr('stDataHint'))+'</p>'
+     + '<div class="row" style="margin-top:10px">'
+     + '<button class="btn" id="s-export">'+esc(tr('expJson'))+'</button>'
+     + '<button class="btn" id="s-import">'+esc(tr('impJson'))+'</button>'
+     + '<input type="file" id="s-file" accept=".json" style="display:none">'
+     + '<button class="btn" id="s-reset">'+esc(tr('reset'))+'</button></div></div>';
+  $('s-body').innerHTML = h;
+
+  $('s-export').onclick = ()=>{
+    const blob = new Blob([JSON.stringify({stats:DB.stats, settings:DB.settings}, null, 1)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (lang()==='en' ? 'spanish-conjugation-stats-' : '西语变位练习-统计-')
+               + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+  };
+  $('s-import').onclick = ()=> $('s-file').click();
+  $('s-file').onchange = e=>{
+    const f = e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ()=>{
+      try{
+        const o = JSON.parse(r.result);
+        if(o.stats) DB.stats = o.stats;
+        if(o.settings) DB.settings = Object.assign(defaultSettings(), o.settings);
+        sanitizeSettings();
+        saveDB(); renderStats(); applyStatic(); alert(tr('impOk'));
+      }catch(err){ alert(tr('impBad', err.message)); }
+    };
+    r.readAsText(f);
+  };
+  $('s-reset').onclick = ()=>{
+    if(!confirm(tr('resetConfirm'))) return;
+    DB.stats = {verbs:{},tenses:{},modes:{},total:{att:0,err:0},wrong:[]};
+    saveDB(); renderStats();
+  };
+}
+
+/* ============================================================
+   变位规则讲解（8 页，中英双语）
+   内容只讲「读懂变位表 + 做题」真正需要的部分，复杂语法点一律外链到权威站点。
+   正文里的 {{G:动词,动词|时态键}} 会展开成变位网格（见 expandGuide）
+   ============================================================ */
+/* 常用权威外链 */
+const lkRae = v => ({
+  u:'https://dle.rae.es/'+encodeURIComponent(v)+'?m=form',
+  n:{zh:'RAE 词典 · '+v+' 的完整变位表', en:'RAE dictionary · full conjugation of '+v},
+  d:{zh:'西班牙皇家语言学院官方词典的变位页，含全部简单与复合时态，可用来核对本程序里的形式。',
+     en:'The RAE’s official conjugation page: every simple and compound form, handy for cross-checking.'}});
+const LK_RAE_GRAM = {
+  u:'https://www.rae.es/gramática/',
+  n:{zh:'RAE · 新西班牙语语法（NGLE）', en:'RAE · Nueva gramática (NGLE)'},
+  d:{zh:'西班牙皇家语言学院与 22 个西语学院合编的官方语法，是西语语法的权威依据。',
+     en:'The official grammar written by the RAE and the 22 Spanish-language academies.'}};
+const LK_DPD = {
+  u:'https://www.rae.es/dpd/',
+  n:{zh:'RAE · 泛西班牙语疑问词典（DPD）', en:'RAE · Diccionario panhispánico de dudas'},
+  d:{zh:'按词条解答实际用法与拼写疑问；遇到「到底能不能这样说 / 这样写」时最好用。',
+     en:'Entry-by-entry answers to real usage and spelling doubts.'}};
+const LK_FUNDEU = {
+  u:'https://www.fundeu.es/',
+  n:{zh:'Fundéu · 西班牙语紧急服务', en:'Fundéu · Fundación del Español Urgente'},
+  d:{zh:'由 RAE 参与支持的用法咨询机构，每天更新实际语言问题的答疑，适合查细节。',
+     en:'Daily advice on real usage questions, backed by the RAE.'}};
+const LK_CVC_A = {
+  u:'https://cvc.cervantes.es/ensenanza/biblioteca_ele/plan_curricular/niveles/02_gramatica_inventario_a1-a2.htm',
+  n:{zh:'塞万提斯学院 · 语法教学大纲 A1–A2', en:'Instituto Cervantes · grammar syllabus A1–A2'},
+  d:{zh:'官方的分级语法清单，能看到入门阶段要求掌握哪些形式。',
+     en:'The official level-by-level grammar inventory for beginners.'}};
+const LK_CVC_B = {
+  u:'https://cvc.cervantes.es/ensenanza/biblioteca_ele/plan_curricular/niveles/02_gramatica_inventario_b1-b2.htm',
+  n:{zh:'塞万提斯学院 · 语法教学大纲 B1–B2', en:'Instituto Cervantes · grammar syllabus B1–B2'},
+  d:{zh:'中级阶段的官方语法清单，虚拟式、命令式都在这一级的要求里。',
+     en:'The official inventory for intermediate levels — subjunctive and imperative included.'}};
+const LK_WIKI_PRES = {
+  u:'https://www.wikilengua.org/index.php/Presente_de_indicativo',
+  n:{zh:'Wikilengua · 一般现在时', en:'Wikilengua · Presente de indicativo'},
+  d:{zh:'由 Fundéu 与塞万提斯学院维护的语法百科，条目短、查得快。',
+     en:'Grammar wiki maintained by Fundéu and the Instituto Cervantes.'}};
+const LK_WIKI_SUBJ = {
+  u:'https://www.wikilengua.org/index.php/Subjuntivo',
+  n:{zh:'Wikilengua · 虚拟式', en:'Wikilengua · Subjuntivo'},
+  d:{zh:'虚拟式的概览条目，适合在弄清形式之后再看用法。',
+     en:'An overview of the subjunctive — best read after the forms are clear.'}};
+const LK_WIKI_ORTH = {
+  u:'https://www.wikilengua.org/index.php/Ortografía',
+  n:{zh:'Wikilengua · 正字法', en:'Wikilengua · Ortografía'},
+  d:{zh:'西语拼写规则的汇总条目，c / g / z / qu 的换写规则都在里面。',
+     en:'A round-up of Spanish spelling rules, including c / g / z / qu alternations.'}};
+const LK_WIKI_IRR = {
+  u:'https://www.wikilengua.org/index.php/Verbo_irregular',
+  n:{zh:'Wikilengua · 不规则动词', en:'Wikilengua · Verbo irregular'},
+  d:{zh:'按类型整理的不规则动词清单，可以和本页的分类对照着看。',
+     en:'Irregular verbs grouped by type — good to read alongside this page.'}};
+const LK_WIKI_ACC = {
+  u:'https://www.wikilengua.org/index.php/Acentuación',
+  n:{zh:'Wikilengua · 重音符规则', en:'Wikilengua · Acentuación'},
+  d:{zh:'重音位置与重音符用法的完整梳理，含双元音、元音连读（hiato）与区分性音符。',
+     en:'A full account of stress placement and the written accent, diphthongs and hiatos included.'}};
+const LK_DPD_TILDE = {
+  u:'https://www.rae.es/dpd/tilde',
+  n:{zh:'RAE 疑问词典 · 重音符（tilde）', en:'RAE DPD · tilde'},
+  d:{zh:'RAE 官方对「什么时候必须写重音符」的逐条规定，最权威的查证处。',
+     en:'The RAE’s official, clause-by-clause rules on when the accent mark is required.'}};
+const LK_DPD_ACCENT = {
+  u:'https://www.rae.es/dpd/acento',
+  n:{zh:'RAE 疑问词典 · 重音（acento）', en:'RAE DPD · acento'},
+  d:{zh:'先讲清「重读」与「重音符」是两件事，再说明词按重音分成四类（aguda / llana / esdrújula / sobresdrújula）。',
+     en:'First separates stress from the written accent, then classifies words by stress position.'}};
+
+/* 8 页讲解。t = 标题，s = 目录里的短标题，b = 正文（HTML），lk = 权威外链 */
+const GUIDE = [
+{
+  k:'basics',
+  t:{zh:'① 入门：动词、词干与一般现在时', en:'① Basics: verbs, stems and the present'},
+  s:{zh:'① 入门与一般现在时', en:'① Basics & present'},
+  zh:`
+<h3>三类动词与「词干 + 词尾」</h3>
+<p>西语动词按不定式词尾分三类：<span class="es">-ar</span>（hablar）、<span class="es">-er</span>（comer）、<span class="es">-ir</span>（vivir）。去掉词尾剩下的部分叫<b>词干</b>（raíz），变位就是「词干 + 人称词尾」。三类的词尾各不相同，所以记变位先认词尾。</p>
+<h3>一般现在时（presente de indicativo）</h3>
+{{G:hablar,comer,vivir|p}}
+<p><span class="es">-er</span> 和 <span class="es">-ir</span> 只有 nosotros、vosotros 两格不同（-emos / -imos、-éis / -ís），其余四个人称完全一致 —— 这是西语变位里最省力的一条规律。</p>
+<h3>主语代词通常省略</h3>
+<p>词尾已经表明了人称，所以 yo / tú / él 一般不说；只有强调对比或消除歧义时才加。</p>
+<h3>词干元音变化：e→ie、o→ue、e→i</h3>
+<p>变化只发生在<b>重音落在词干上</b>的四个人称（yo、tú、él、ellos），nosotros 和 vosotros 保持原形，形状像一只靴子（习称 <i>verbos de bota</i>）。三类的典型代表各举一个：</p>
+{{G:pensar,poder,pedir|p}}
+<h3>只在 yo 上不规则的常见动词</h3>
+<p>下面这些动词其余五个人称完全规则，只有第一人称单数要单独记。表里着色的就是那个多出来的字母：</p>
+{{G:tener,poner,salir,hacer,conocer,conducir,dar,saber,ver|p}}
+<div class="tip">这个 yo 形式的词干会一直<b>传染到虚拟式</b>：tener → tenga、hacer → haga、salir → salga、conocer → conozca。记住 yo 形式，等于顺手记住了虚拟式的一半。</div>
+<h3>什么时候用现在时</h3>
+<ul>
+<li>当前的事实与状态：<span class="es">Vivo en Madrid.</span></li>
+<li>习惯与反复发生的动作：<span class="es">Desayuno a las siete.</span></li>
+<li>普遍真理：<span class="es">El agua hierve a 100 grados.</span></li>
+<li>近期将来（口语常用）：<span class="es">Mañana te llamo.</span></li>
+</ul>`,
+  en:`
+<h3>Three conjugations, one recipe</h3>
+<p>Spanish verbs fall into three groups by infinitive ending: <span class="es">-ar</span> (hablar), <span class="es">-er</span> (comer), <span class="es">-ir</span> (vivir). Drop the ending and you get the <b>stem</b> (raíz); conjugating is just “stem + person ending”. Because the three groups have different endings, learn the endings first.</p>
+<h3>Present indicative (presente de indicativo)</h3>
+{{G:hablar,comer,vivir|p}}
+<p><span class="es">-er</span> and <span class="es">-ir</span> differ only in nosotros and vosotros (-emos / -imos, -éis / -ís); the other four persons are identical. That is the single biggest shortcut in Spanish conjugation.</p>
+<h3>Subject pronouns are usually dropped</h3>
+<p>The ending already marks the person, so yo / tú / él are only added for emphasis or to remove ambiguity.</p>
+<h3>Stem-vowel changes: e→ie, o→ue, e→i</h3>
+<p>The change happens only where the <b>stress falls on the stem</b> — yo, tú, él, ellos. Nosotros and vosotros keep the original vowel, which is why this pattern is nicknamed the <i>boot</i> verb (verbos de bota). One representative verb for each type:</p>
+{{G:pensar,poder,pedir|p}}
+<h3>Verbs irregular only in yo</h3>
+<p>Everything else about these verbs is regular — only the first person singular has to be memorised. The coloured letters in the tables are the ones that were added or swapped:</p>
+{{G:tener,poner,salir,hacer,conocer,conducir,dar,saber,ver|p}}
+<div class="tip">That yo stem is then <b>inherited by the whole present subjunctive</b>: tener → tenga, hacer → haga, salir → salga, conocer → conozca. Learn the yo form and you get half the subjunctive for free.</div>
+<h3>When the present is used</h3>
+<ul>
+<li>Current facts and states: <span class="es">Vivo en Madrid.</span></li>
+<li>Habits and repeated actions: <span class="es">Desayuno a las siete.</span></li>
+<li>General truths: <span class="es">El agua hierve a 100 grados.</span></li>
+<li>Near future in speech: <span class="es">Mañana te llamo.</span></li>
+</ul>`,
+  lk:[lkRae('hablar'), LK_WIKI_PRES, LK_RAE_GRAM, LK_CVC_A]
+},
+{
+  k:'past',
+  t:{zh:'② 四种过去时：一次说清', en:'② The four past tenses'},
+  s:{zh:'② 四种过去时', en:'② Four past tenses'},
+  zh:`
+<h3>先分清四种「过去」</h3>
+<table>
+<tr><th>时态</th><th>构成</th><th>核心感觉</th></tr>
+<tr><td>现在完成时<br><span class="es">pretérito perfecto</span></td><td>he / has / ha / hemos / habéis / han + 分词</td><td>与「现在」仍然相连的一段过去：今天、这周、刚刚</td></tr>
+<tr><td>简单过去时<br><span class="es">pretérito indefinido</span></td><td>hablé, hablaste, habló…</td><td>一次性的、已经结束的动作，强调「发生了」</td></tr>
+<tr><td>过去未完成时<br><span class="es">pretérito imperfecto</span></td><td>hablaba, hablabas, hablaba…</td><td>背景、描写、习惯、正在进行的动作，不关心起止点</td></tr>
+<tr><td>过去完成时<br><span class="es">pluscuamperfecto</span></td><td>había + 分词</td><td>「过去的过去」，比另一个过去动作更早</td></tr>
+</table>
+<h3>规则词尾</h3>
+{{G:hablar,comer|pr}}
+{{G:hablar,comer|i}}
+<p>三点值得留意：简单过去时 <span class="es">-ar</span> 与 <span class="es">-er/-ir</span> 的词尾完全不同；过去未完成时 <span class="es">-er/-ir</span> 共用一套词尾（-ía…），且这个 <b>í 永远带重音</b>；过去未完成时只有三个不规则 —— ser → era、ir → iba、ver → veía。</p>
+<h3>不规则的「强过去式」</h3>
+<p>一批最高频的动词换掉整个词干，并且<b>词尾重音不再打在结尾</b>（-e, -iste, -o, -imos, -isteis, -ieron）。十二个动词排成两排，注意整张表里没有一格是规则形状：</p>
+{{G:estar,tener,andar,haber,hacer,decir|pr}}
+{{G:venir,querer,poder,poner,saber,traer|pr}}
+<p>其中 ser 与 ir 的简单过去时<b>完全同形</b>，而且六个形式没有一个是规则的：</p>
+{{G:ser,ir|pr}}
+<div class="tip ok">这套词干会<b>原封不动地传给虚拟式过去未完成时</b>：tuve → tuviera / tuviese，hice → hiciera / hiciese。记一个词干，等于拿下一整片形式。</div>
+<ul>
+<li>-ir 的强过去式还有「第三人称换元音」：dormir → durmió / durmieron；pedir → pidió / pidieron；sentir → sintió / sintieron。</li>
+<li>decir、traer 这类以 j 结尾的词干，第三人称复数写作 -jeron：dijeron、trajeron。</li>
+</ul>
+<h3>常见的不规则过去分词</h3>
+<p>还有一批动词的分词不走 -ado / -ido，只能单独记（放在现在完成时里看）：</p>
+{{G:hacer,decir,ver,poner|pp}}
+{{G:escribir,abrir,cubrir,romper|pp}}
+{{G:volver,morir,resolver,devolver|pp}}
+<p>它们同时出现在现在完成时、过去完成时、将来完成时和被动语态里 —— 一个记错会连错好几处。</p>
+<h3>选哪个：一个判断顺序</h3>
+<ul>
+<li>还影响「现在」→ 现在完成时。<span class="es">Hoy he comido paella.</span></li>
+<li>是「发生了一件事」→ 简单过去时。<span class="es">Ayer comí paella.</span></li>
+<li>是「当时的样子 / 习惯 / 正在做」→ 过去未完成时。<span class="es">Cuando era niño, comía paella todos los domingos.</span></li>
+<li>比另一个过去动作更早 → 过去完成时。<span class="es">Cuando llegué, ya habían comido.</span></li>
+</ul>
+<div class="tip">同一个句子里，过去未完成时提供「布景」，简单过去时推进「剧情」：<span class="es">Leía cuando sonó el teléfono.</span></div>`,
+  en:`
+<h3>Telling the four pasts apart</h3>
+<table>
+<tr><th>Tense</th><th>Formed with</th><th>Core feeling</th></tr>
+<tr><td>Present perfect<br><span class="es">pretérito perfecto</span></td><td>he / has / ha / hemos / habéis / han + participle</td><td>A past still connected to now: today, this week, just now</td></tr>
+<tr><td>Preterite<br><span class="es">pretérito indefinido</span></td><td>hablé, hablaste, habló…</td><td>A one-off, finished action — it happened</td></tr>
+<tr><td>Imperfect<br><span class="es">pretérito imperfecto</span></td><td>hablaba, hablabas, hablaba…</td><td>Background, description, habit, ongoing action — no interest in start or end</td></tr>
+<tr><td>Pluperfect<br><span class="es">pluscuamperfecto</span></td><td>había + participle</td><td>The past of the past — earlier than another past action</td></tr>
+</table>
+<h3>Regular endings</h3>
+{{G:hablar,comer|pr}}
+{{G:hablar,comer|i}}
+<p>Three things to notice: preterite endings are completely different for <span class="es">-ar</span> and <span class="es">-er/-ir</span>; the imperfect shares one set of endings for <span class="es">-er/-ir</span> (-ía…) and that <b>í always carries an accent</b>; and the imperfect has only three irregular verbs — ser → era, ir → iba, ver → veía.</p>
+<h3>Strong preterites</h3>
+<p>A group of very frequent verbs swaps the whole stem and <b>moves the stress off the ending</b> (-e, -iste, -o, -imos, -isteis, -ieron). Twelve verbs in two rows — not one cell in either table has a regular shape:</p>
+{{G:estar,tener,andar,haber,hacer,decir|pr}}
+{{G:venir,querer,poder,poner,saber,traer|pr}}
+<p>Most frequent of all, the preterites of <span class="es">ser</span> and <span class="es">ir</span> are <b>completely identical</b> — and not one of the six forms is regular:</p>
+{{G:ser,ir|pr}}
+<div class="tip ok">Those stems are then <b>reused unchanged by the past subjunctive</b>: tuve → tuviera / tuviese, hice → hiciera / hiciese. One stem buys you a whole family of forms.</div>
+<ul>
+<li>Some <span class="es">-ir</span> verbs also change the vowel in the third person: dormir → durmió / durmieron; pedir → pidió / pidieron; sentir → sintió / sintieron.</li>
+<li>Stems ending in j take -jeron in the third person plural: dijeron, trajeron.</li>
+</ul>
+<h3>Common irregular participles</h3>
+<p>Another group forms the participle without -ado / -ido and simply has to be learnt (shown here inside the present perfect):</p>
+{{G:hacer,decir,ver,poner|pp}}
+{{G:escribir,abrir,cubrir,romper|pp}}
+{{G:volver,morir,resolver,devolver|pp}}
+<p>They appear in the present perfect, pluperfect, future perfect and the passive — one mistake propagates through several tenses.</p>
+<h3>Choosing: a decision order</h3>
+<ul>
+<li>Still connected to now → present perfect. <span class="es">Hoy he comido paella.</span></li>
+<li>A single finished event → preterite. <span class="es">Ayer comí paella.</span></li>
+<li>How things were / a habit / in progress → imperfect. <span class="es">Cuando era niño, comía paella todos los domingos.</span></li>
+<li>Earlier than another past action → pluperfect. <span class="es">Cuando llegué, ya habían comido.</span></li>
+</ul>
+<div class="tip">In one sentence the imperfect sets the <b>scene</b> and the preterite moves the <b>plot</b>: <span class="es">Leía cuando sonó el teléfono.</span></div>`,
+  lk:[lkRae('tener'), lkRae('ser'), LK_RAE_GRAM, LK_CVC_B]
+},
+{
+  k:'imperative',
+  t:{zh:'③ 命令式：形式与代词位置', en:'③ The imperative: forms and pronoun placement'},
+  s:{zh:'③ 命令式', en:'③ Imperative'},
+  zh:`
+<h3>肯定命令式（imperativo afirmativo）</h3>
+<p>只有五个人称（没有 yo），三条规则就能拼完：<b>tú</b> 用第三人称单数的现在时；<b>usted / nosotros / ustedes</b> 直接用虚拟式现在时；<b>vosotros</b> 把不定式的 -r 换成 -d。右边就是这三条规则的结果：</p>
+{{G:hablar,comer,vivir|ia}}
+<div class="tip warnx">八个不规则的 tú 形式必须单独背：<b>di</b>（decir）、<b>haz</b>（hacer）、<b>ve</b>（ir）、<b>pon</b>（poner）、<b>sal</b>（salir）、<b>sé</b>（ser）、<b>ten</b>（tener）、<b>ven</b>（venir）。它们都很短，凑在一起很好记：</div>
+{{G:decir,hacer,ir,poner|ia}}
+{{G:salir,ser,tener,venir|ia}}
+<h3>否定命令式（imperativo negativo）</h3>
+<p>规则极其统一：<b>no + 虚拟式现在时</b>，六个人称全部如此 —— no hables, no hable, no hablemos, no habléis, no hablen。所以真正要记的其实只有虚拟式现在时的词形；词干变化也照旧带进来（pensar → no pienses）：</p>
+{{G:hablar,pensar|in}}
+<h3>代词放哪：肯定后置、否定前置</h3>
+<ul>
+<li>肯定：代词粘在动词后面，写成一个词。<span class="es">dime、cómpralo、levántate、siéntese</span></li>
+<li>否定：代词放在动词前面，写成三个词。<span class="es">no me digas、no lo compres、no te levantes</span></li>
+</ul>
+<div class="tip">后面接代词时常常要补回重音，保持原来的重读位置：dar + me + lo → <b>dámelo</b>；poner + te + lo → <b>ponértelo</b>；poner + te → <b>ponte</b>（两音节，不必补）；irse + te → <b>vete</b>。</div>
+<h3>两个细节</h3>
+<ul>
+<li><b>vosotros</b> 的唯一不规则是 ir：ir → id → 加 os 时写 <b>¡íos!</b>（去掉 d）。</li>
+<li>否定命令式的虚拟式词干照旧继承 yo 形式的不规则与词干变化：tener → <span class="es">no tengas</span>；pensar → <span class="es">no pienses</span>；pedir → <span class="es">no pidas</span>。</li>
+</ul>
+<h3>不要滥用命令式</h3>
+<p>对不熟的人直接用命令式会显得强硬。日常更常用疑问句或条件式来「下命令」：<span class="es">¿Puede usted…? / ¿Podría cerrar la ventana?</span></p>`,
+  en:`
+<h3>Affirmative imperative</h3>
+<p>Only five persons (there is no yo) and three rules: <b>tú</b> takes the third person singular of the present; <b>usted / nosotros / ustedes</b> take the present subjunctive as it stands; <b>vosotros</b> swaps the infinitive’s -r for -d. The tables below are those three rules at work:</p>
+{{G:hablar,comer,vivir|ia}}
+<div class="tip warnx">Eight tú forms are irregular and worth memorising on their own: <b>di</b> (decir), <b>haz</b> (hacer), <b>ve</b> (ir), <b>pon</b> (poner), <b>sal</b> (salir), <b>sé</b> (ser), <b>ten</b> (tener), <b>ven</b> (venir). They are all short, so they stick easily:</div>
+{{G:decir,hacer,ir,poner|ia}}
+{{G:salir,ser,tener,venir|ia}}
+<h3>Negative imperative</h3>
+<p>Perfectly regular: <b>no + present subjunctive</b> for all six persons — no hables, no hable, no hablemos, no habléis, no hablen. So the only thing you really need is the present subjunctive, stem changes included (pensar → no pienses):</p>
+{{G:hablar,pensar|in}}
+<h3>Where pronouns go</h3>
+<ul>
+<li>Affirmative: glued to the end, written as one word. <span class="es">dime, cómpralo, levántate, siéntese</span></li>
+<li>Negative: in front, written as separate words. <span class="es">no me digas, no lo compres, no te levantes</span></li>
+</ul>
+<div class="tip">When pronouns are attached, an accent is often added to keep the original stress: dar + me + lo → <b>dámelo</b>; poner + te + lo → <b>ponértelo</b>; poner + te → <b>ponte</b> (two syllables, no accent); irse + te → <b>vete</b>.</div>
+<h3>Two details</h3>
+<ul>
+<li>The only irregular <b>vosotros</b> form is ir: ir → id → with os it becomes <b>¡íos!</b> (the d is dropped).</li>
+<li>The negative imperative inherits all the yo-form irregularity and stem changes: tener → <span class="es">no tengas</span>; pensar → <span class="es">no pienses</span>; pedir → <span class="es">no pidas</span>.</li>
+</ul>
+<h3>Do not overuse it</h3>
+<p>With strangers a bare command sounds blunt. Questions and conditionals are the politer route: <span class="es">¿Puede usted…? / ¿Podría cerrar la ventana?</span></p>`,
+  lk:[lkRae('haber'), lkRae('hacer'), LK_DPD, LK_CVC_B]
+},
+{
+  k:'future',
+  t:{zh:'④ 将来式：将来时与条件式是「一对」', en:'④ The future: simple future and conditional come as a pair'},
+  s:{zh:'④ 将来式', en:'④ Future'},
+  zh:`
+<h3>将来时（futuro simple）</h3>
+<p>所有动词共用一个词干 —— <b>整个不定式</b>，再统一加词尾：</p>
+{{G:hablar,comer,vivir|f}}
+<p>三类动词共用同一套词尾，<b>重音全落在词尾</b>；注意 -er / -ir 也保留自己的元音（comeré，不是 comaré）。</p>
+<h3>十二个不规则词干</h3>
+<p>这里变的不是词尾，而是词干，最好整块背下来：</p>
+<ul>
+<li>tener → tendr-；poner → pondr-；salir → saldr-；venir → vendr-</li>
+<li>poder → podr-；querer → querr-；saber → sabr-；haber → habr-</li>
+<li>hacer → har-；decir → dir-；caber → cabr-；valer → valdr-</li>
+</ul>
+<p>放进整张表里看更清楚：不规则的只是<b>词干里多出来的那个字母</b>，词尾和完全规则的动词一模一样：</p>
+{{G:tener,poner,hacer,decir|f}}
+<h3>条件式用的是同一套词干</h3>
+<p>条件式 = 同一个词干 + <span class="es">-ía</span> 系列词尾（-ía, -ías, -ía, -íamos, -íais, -ían）。所以 <b>将来时与条件式永远成对出现</b>，不规则也完全一致，把两张表对照着记，一门等于两门：</p>
+{{G:tener,decir|f}}
+{{G:tener,decir|c}}
+<h3>复合形式</h3>
+<p><span class="es">haber</span> 的将来时 + 过去分词 = 将来完成时：<span class="es">habré hablado, habrás comido</span>；条件完成时同理：<span class="es">habría hablado</span>。</p>
+<h3>用法</h3>
+<ul>
+<li>真正的将来：<span class="es">Mañana lloverá.</span></li>
+<li>对现在的推测：<span class="es">Serán las tres.</span>（大概三点了）</li>
+<li>语气强一点的吩咐：<span class="es">Harás lo que te digo.</span></li>
+</ul>
+<div class="tip">口语里表示「将要做某事」，更常用 <b>ir a + 不定式</b>：<span class="es">Voy a llamarte.</span> 但「推测」这一层含义是 ir a 做不到的，正是将来时最独特的地方。</div>`,
+  en:`
+<h3>Simple future</h3>
+<p>Every verb uses one and the same stem — the <b>whole infinitive</b> — plus one shared set of endings:</p>
+{{G:hablar,comer,vivir|f}}
+<p>All three conjugations share the endings and the <b>stress always falls on the ending</b>. Note that -er / -ir keep their own vowel: comeré, never comaré.</p>
+<h3>Twelve irregular stems</h3>
+<p>Here it is the stem, not the ending, that changes. Best learnt as one block:</p>
+<ul>
+<li>tener → tendr-; poner → pondr-; salir → saldr-; venir → vendr-</li>
+<li>poder → podr-; querer → querr-; saber → sabr-; haber → habr-</li>
+<li>hacer → har-; decir → dir-; caber → cabr-; valer → valdr-</li>
+</ul>
+<p>In full tables it is clearer: the only irregular thing is the <b>extra letter inside the stem</b> — the endings are exactly the regular ones:</p>
+{{G:tener,poner,hacer,decir|f}}
+<h3>The conditional uses the very same stems</h3>
+<p>Conditional = same stem + the <span class="es">-ía</span> endings (-ía, -ías, -ía, -íamos, -íais, -ían). So the future and the conditional <b>always travel together</b>, irregulars and all. Read the two tables side by side and one buys you the other:</p>
+{{G:tener,decir|f}}
+{{G:tener,decir|c}}
+<h3>Compound forms</h3>
+<p>Future of <span class="es">haber</span> + participle = future perfect: <span class="es">habré hablado, habrás comido</span>. The conditional perfect works the same way: <span class="es">habría hablado</span>.</p>
+<h3>Uses</h3>
+<ul>
+<li>Real future: <span class="es">Mañana lloverá.</span></li>
+<li>Speculation about the present: <span class="es">Serán las tres.</span> (it must be about three)</li>
+<li>A firm instruction: <span class="es">Harás lo que te digo.</span></li>
+</ul>
+<div class="tip">In speech, “going to do something” is usually <b>ir a + infinitive</b>: <span class="es">Voy a llamarte.</span> But ir a cannot express speculation — that is the future tense’s own speciality.</div>`,
+  lk:[lkRae('tener'), lkRae('hacer'), LK_RAE_GRAM, LK_CVC_B]
+},
+{
+  k:'subj',
+  t:{zh:'⑤ 虚拟语气与条件式', en:'⑤ The subjunctive and the conditional'},
+  s:{zh:'⑤ 虚拟语气与条件式', en:'⑤ Subjunctive & conditional'},
+  zh:`
+<h3>虚拟式现在时：从 yo 形式出发</h3>
+<p>造虚拟式现在时只有两步：</p>
+<ul>
+<li>取<b>现在时的 yo 形式</b>，去掉词尾 -o，得到词干；</li>
+<li><span class="es">-ar</span> 动词加 <b>-e</b> 系列词尾，<span class="es">-er/-ir</span> 动词加 <b>-a</b> 系列词尾（两类正好对调）。</li>
+</ul>
+{{G:hablar,comer,tener|sp}}
+<p>因为都从 yo 形式出发，现在时里「只在 yo 上不规则」的词干会自动带进来：tener → tengo → <b>tenga</b>，hacer → hago → <b>haga</b>，salir → salgo → <b>salga</b>，conocer → conozco → <b>conozca</b>。词干元音变化也照搬：pensar → piense、poder → pueda、pedir → pida。</p>
+<div class="tip warnx">六个必须单独记：<b>ser → sea</b>、<b>estar → esté</b>、<b>ir → vaya</b>、<b>haber → haya</b>、<b>saber → sepa</b>、<b>dar → dé</b>（带重音，用来和介词 de 区分；它是唯一带重音的虚拟式形式）。</div>
+<h3>虚拟式过去未完成时：从 ellos 形式出发</h3>
+<p>取<b>简单过去时第三人称复数</b>，去掉 -ron，再加 <span class="es">-ra</span> 或 <span class="es">-se</span> 词尾：</p>
+<ul>
+<li>hablaron → habla- → <span class="es">hablara / hablase</span></li>
+<li>comieron → comie- → <span class="es">comiera / comiese</span></li>
+<li>tuvieron → tuvie- → <span class="es">tuviera / tuviese</span>（强过去式的词干自动继承）</li>
+</ul>
+<p><b>-ra 与 -se 两种形式都正确</b>，只是地区习惯不同；在本程序里两种都判为正确。左边规则动词、右边强词干动词，对照着看：</p>
+{{G:hablar,tener|si}}
+<h3>什么时候用虚拟式</h3>
+<ul>
+<li>主句表达愿望、情感、怀疑、评价，从句由 que 引导：<span class="es">Quiero que vengas. / Dudo que sea cierto.</span></li>
+<li>ojalá、quizá、tal vez 之后：<span class="es">Ojalá llueva.</span></li>
+<li>指将来的时间、目的、条件从句：<span class="es">Cuando llegues, llámame.</span></li>
+<li>否定命令式：<span class="es">No hables.</span></li>
+</ul>
+<p>核心判据只有一个：从句说的是<b>事实</b>还是<b>意向中的事</b>。陈述事实用陈述式，表达意愿、怀疑、未定则用虚拟式。（这里的用法规则比形式复杂得多，需要细究时请走下面的权威外链。）</p>
+<h3>条件式（condicional simple）</h3>
+<p>构词法与将来时完全同源（词干相同、词尾换成 -ía 系列），所以不规则也完全一样：tendría、haría、pondría、diría… 两组并排看，一眼就明白为什么说「一门等于两门」：</p>
+{{G:tener|f}}
+{{G:tener|c}}
+<ul>
+<li>礼貌请求：<span class="es">¿Podrías ayudarme?</span></li>
+<li>假设条件下的结果：<span class="es">Si tuviera tiempo, iría.</span></li>
+<li>过去视角里的将来：<span class="es">Dijo que vendría.</span></li>
+</ul>
+<h3>si 句型的三种搭配</h3>
+<table>
+<tr><th>条件从句</th><th>主句</th><th>例子</th></tr>
+<tr><td>si + 现在时</td><td>将来时 / 现在时 / 命令式</td><td>Si tengo tiempo, iré.</td></tr>
+<tr><td>si + 虚拟式过去未完成时</td><td>条件式</td><td>Si tuviera tiempo, iría.</td></tr>
+<tr><td>si + 虚拟式过去完成时</td><td>条件完成时</td><td>Si hubiera tenido tiempo, habría ido.</td></tr>
+</table>
+<div class="tip warnx">si 后面<b>永远不接</b>条件式或将来时：<s>si tendría</s>、<s>si tendré</s> 都是错的。</div>`,
+  en:`
+<h3>Present subjunctive: start from yo</h3>
+<p>Two steps only:</p>
+<ul>
+<li>Take the <b>yo form of the present</b>, drop the -o to get the stem;</li>
+<li><span class="es">-ar</span> verbs take the <b>-e</b> endings, <span class="es">-er/-ir</span> verbs take the <b>-a</b> endings (the two groups swap).</li>
+</ul>
+{{G:hablar,comer,tener|sp}}
+<p>Because everything starts from the yo form, the “irregular only in yo” stems come along for free: tener → tengo → <b>tenga</b>, hacer → hago → <b>haga</b>, salir → salgo → <b>salga</b>, conocer → conozco → <b>conozca</b>. Stem-vowel changes transfer as well: pensar → piense, poder → pueda, pedir → pida.</p>
+<div class="tip warnx">Six to memorise separately: <b>ser → sea</b>, <b>estar → esté</b>, <b>ir → vaya</b>, <b>haber → haya</b>, <b>saber → sepa</b>, <b>dar → dé</b> (accented, to distinguish it from the preposition de — the only accented subjunctive form).</div>
+<h3>Past subjunctive: start from ellos</h3>
+<p>Take the <b>third person plural of the preterite</b>, drop -ron, add <span class="es">-ra</span> or <span class="es">-se</span>:</p>
+<ul>
+<li>hablaron → habla- → <span class="es">hablara / hablase</span></li>
+<li>comieron → comie- → <span class="es">comiera / comiese</span></li>
+<li>tuvieron → tuvie- → <span class="es">tuviera / tuviese</span> (strong preterite stems carry over automatically)</li>
+</ul>
+<p><b>Both the -ra and the -se forms are correct</b> — only regional preference differs. This app accepts either. A regular verb and a strong-stem verb, side by side:</p>
+{{G:hablar,tener|si}}
+<h3>When the subjunctive is used</h3>
+<ul>
+<li>Wishes, emotions, doubt or judgements in the main clause, with a que clause: <span class="es">Quiero que vengas. / Dudo que sea cierto.</span></li>
+<li>After ojalá, quizá, tal vez: <span class="es">Ojalá llueva.</span></li>
+<li>Time, purpose and conditional clauses referring to the future: <span class="es">Cuando llegues, llámame.</span></li>
+<li>The negative imperative: <span class="es">No hables.</span></li>
+</ul>
+<p>The one core test: does the clause state a <b>fact</b> or something <b>intended / unreal</b>? Facts take the indicative; wishes, doubt and non-reality take the subjunctive. (The usage rules are far more intricate than the forms — follow the authoritative links below for detail.)</p>
+<h3>Conditional (condicional simple)</h3>
+<p>Built exactly like the future (same stems, endings replaced by the -ía set), so the irregulars are identical: tendría, haría, pondría, diría… Side by side, it is obvious why one buys you the other:</p>
+{{G:tener|f}}
+{{G:tener|c}}
+<ul>
+<li>Polite requests: <span class="es">¿Podrías ayudarme?</span></li>
+<li>Result under a hypothetical condition: <span class="es">Si tuviera tiempo, iría.</span></li>
+<li>Future seen from the past: <span class="es">Dijo que vendría.</span></li>
+</ul>
+<h3>The three si-patterns</h3>
+<table>
+<tr><th>If-clause</th><th>Main clause</th><th>Example</th></tr>
+<tr><td>si + present</td><td>future / present / imperative</td><td>Si tengo tiempo, iré.</td></tr>
+<tr><td>si + past subjunctive</td><td>conditional</td><td>Si tuviera tiempo, iría.</td></tr>
+<tr><td>si + pluperfect subjunctive</td><td>conditional perfect</td><td>Si hubiera tenido tiempo, habría ido.</td></tr>
+</table>
+<div class="tip warnx">After si you <b>never</b> use the conditional or the future: <s>si tendría</s>, <s>si tendré</s> are both wrong.</div>`,
+  lk:[lkRae('tener'), lkRae('ser'), LK_WIKI_SUBJ, LK_DPD, LK_RAE_GRAM]
+},
+{
+  k:'orth',
+  t:{zh:'⑥ 正字法不规则：只改拼写，不改读音', en:'⑥ Spelling changes: the sound stays, the letters move'},
+  s:{zh:'⑥ 正字法不规则整理', en:'⑥ Spelling changes'},
+  zh:`
+<h3>这一类变化是什么</h3>
+<p>它<b>不改变读音，只改变拼写</b>。原因是 c、g、z、qu 这些字母在不同元音前读音不同：词尾一变，为了保住原来的读音，字母就必须跟着调整。</p>
+<p>判断方法只有一句话：先按规则写出「理论上」的形式，读一遍；<b>读音变了就换写法，读音没变就不动</b>。</p>
+<h3>1 · 保住 c 的 /k/ 音：c → qu</h3>
+<p>代表动词：<span class="es">sacar、buscar、explicar、tocar</span>。用 tocar 走一遍 —— 注意范围不同：简单过去时只有 yo 要改，虚拟式是<b>六个人称全改</b>：</p>
+{{G:tocar|pr}}
+{{G:tocar|sp}}
+<p>c 在 e、i 前读 /θ/ 或 /s/，所以在简单过去时 yo 和整个虚拟式里必须换成 qu，才能保住 /k/。</p>
+<h3>2 · 保住 g 的 /g/ 音：g → gu</h3>
+<p>代表动词：<span class="es">llegar、pagar、jugar、investigar</span>。范围与上面一致 —— 简单过去时只有 yo，虚拟式六个人称全改：</p>
+{{G:llegar|pr}}
+{{G:llegar|sp}}
+<p><span class="es">jugar</span> 是唯一的 <b>u → ue</b> 动词，于是两种变化叠在一起：虚拟式 <span class="es">juegue</span> 里两个 u 各管一摊 —— <b>ue</b> 是词干交替，<b>gu</b> 是保住 /g/ 的写法。</p>
+{{G:jugar|pr}}
+{{G:jugar|sp}}
+<h3>3 · -zar 动词：z → c</h3>
+<p>代表动词：<span class="es">empezar、cruzar、abrazar、realizar</span>。</p>
+{{G:empezar|pr}}
+{{G:empezar|sp}}
+<p>z 永远不出现在 e、i 前，所以一律改写成 c，读音完全不变。empezar 还兼有 e → ie 的词干交替，在同一张表里也一并看得见。</p>
+<h3>4 · -ger / -gir 动词：g → j</h3>
+<p>代表动词：<span class="es">coger、dirigir、elegir、proteger</span>。这一类改的是<b>现在时 yo</b> 和<b>整个虚拟式</b>：</p>
+{{G:coger|p}}
+{{G:coger|sp}}
+<p>g 在 e、i 前读 /x/，想保持 /x/ 就直接写 j。所以 coger 的 yo 是 <span class="es">cojo</span>，不是 <s>cogo</s>。</p>
+<h3>5 · 元音之间的 i → y</h3>
+<p>两类：<span class="es">-uir</span> 动词（<span class="es">construir、incluir</span>）除 nosotros / vosotros 外，其余人称都在词尾加 y；<span class="es">leer、creer、oír</span> 这类则只在第三人称把 i 换成 y。两种写法对照：</p>
+{{G:construir|p}}
+{{G:leer|pr}}
+<h3>6 · -guir：g 脱落</h3>
+<p>代表动词：<span class="es">seguir、conseguir、distinguir</span>。g 后面的 u 只为保住 /g/ 而存在，一旦词尾是 e、i，u 就多余，直接脱落：</p>
+{{G:seguir|p}}
+<p>seguir 同时还有 <b>e → i</b> 的词干交替，所以 yo 是 <span class="es">sigo</span>，不是 <s>siguo</s>。</p>
+<h3>7 · 命令式里的重音书写</h3>
+<p>代词粘到动词后面时，单词变长但<b>重音位置不变</b>，因此常常要补写重音符号：dar + me + lo → <b>dámelo</b>；poner + te + lo → <b>ponértelo</b>；irse + te → <b>vete</b>（两音节，不必补）。这些形式正是靠重音符号与普通陈述句区分开。看两组自复动词的命令式，重音符的位置一目了然：</p>
+{{G:levantarse|ia}}
+{{G:irse|ia}}
+<div class="tip">一句话总结：<b>先按规则变，再读一遍；读音不变就不改，读音变了就换字母。</b> 在本程序里，这一类形式统一用青色标出。</div>`,
+  en:`
+<h3>What this category is</h3>
+<p>These changes <b>never alter the pronunciation, only the spelling</b>. The reason is that c, g, z and qu sound different depending on the following vowel: when the ending changes, the letters must change with it to preserve the original sound.</p>
+<p>The test is one sentence long: write the “theoretical” form by the rules, then read it out. <b>If the sound changed, change the letters; if it did not, leave them alone.</b></p>
+<h3>1 · Keep the /k/ of c: c → qu</h3>
+<p>Typical verbs: <span class="es">sacar, buscar, explicar, tocar</span>. Here it is with tocar — note the different scope: in the preterite only yo changes, in the subjunctive <b>all six persons do</b>:</p>
+{{G:tocar|pr}}
+{{G:tocar|sp}}
+<p>Before e and i, c is pronounced /θ/ or /s/, so the preterite yo form and the whole subjunctive must switch to qu to keep the /k/.</p>
+<h3>2 · Keep the /g/ of g: g → gu</h3>
+<p>Typical verbs: <span class="es">llegar, pagar, jugar, investigar</span>. The scope matches the previous group — preterite yo only, subjunctive in all six persons:</p>
+{{G:llegar|pr}}
+{{G:llegar|sp}}
+<p><span class="es">jugar</span> is the only <b>u → ue</b> verb, so the two changes stack here: in the subjunctive <span class="es">juegue</span> the two u’s have separate jobs — <b>ue</b> is the stem alternation, <b>gu</b> is what keeps the /g/ sound.</p>
+{{G:jugar|pr}}
+{{G:jugar|sp}}
+<h3>3 · -zar verbs: z → c</h3>
+<p>Typical verbs: <span class="es">empezar, cruzar, abrazar, realizar</span>.</p>
+{{G:empezar|pr}}
+{{G:empezar|sp}}
+<p>z never appears before e or i, so it is always rewritten as c — the sound is untouched. empezar also carries an e → ie alternation, visible in the same table.</p>
+<h3>4 · -ger / -gir verbs: g → j</h3>
+<p>Typical verbs: <span class="es">coger, dirigir, elegir, proteger</span>. What changes is the <b>present-tense yo</b> and the <b>whole subjunctive</b>:</p>
+{{G:coger|p}}
+{{G:coger|sp}}
+<p>Before e and i, g is pronounced /x/, so it is written j to keep that sound. That is why the yo form of coger is <span class="es">cojo</span>, not <s>cogo</s>.</p>
+<h3>5 · i → y between vowels</h3>
+<p>Two kinds: <span class="es">-uir</span> verbs (<span class="es">construir, incluir</span>) add a y in every person except nosotros / vosotros; verbs like <span class="es">leer, creer, oír</span> only swap i for y in the third person. Side by side:</p>
+{{G:construir|p}}
+{{G:leer|pr}}
+<h3>6 · -guir: the g disappears</h3>
+<p>Typical verbs: <span class="es">seguir, conseguir, distinguir</span>. The u after g exists only to keep the /g/ sound, so as soon as the ending is e or i the u is redundant and drops out:</p>
+{{G:seguir|p}}
+<p>seguir also carries an <b>e → i</b> alternation, so the yo form is <span class="es">sigo</span>, not <s>siguo</s>.</p>
+<h3>7 · Written accents in the imperative</h3>
+<p>When pronouns are attached, the word grows longer but the <b>stress stays where it was</b>, so an accent is often added: dar + me + lo → <b>dámelo</b>; poner + te + lo → <b>ponértelo</b>; irse + te → <b>vete</b> (two syllables, no accent needed). Those accents are exactly what distinguishes these forms from ordinary statements. Two reflexive paradigms show the accent position at a glance:</p>
+{{G:levantarse|ia}}
+{{G:irse|ia}}
+<div class="tip">In one line: <b>conjugate by the rules, then read it aloud — unchanged sound, unchanged spelling.</b> In this app, forms of this kind are shown in teal.</div>`,
+  lk:[lkRae('empezar'), lkRae('seguir'), LK_WIKI_ORTH, LK_DPD]
+},
+{
+  k:'stem',
+  t:{zh:'⑦ 词根变化不规则：元音交替与强词干', en:'⑦ Stem changes: vowel alternation and strong stems'},
+  s:{zh:'⑦ 词根变化不规则整理', en:'⑦ Stem changes'},
+  zh:`
+<h3>这一类变化是什么</h3>
+<p>它动的是<b>词干里的元音或辅音</b>，真的改变了读音 —— 这和正字法（只改拼写）完全不同。判断依据很简单：看同一个动词在不同人称 / 时态下，词干是否还是原来的样子。</p>
+<h3>1 · 词干元音交替：e→ie、o→ue、e→i</h3>
+<p>只在重读词干的人称（yo、tú、él、ellos）出现，nosotros / vosotros 保持原样：</p>
+<ul>
+<li><b>e → ie</b>：pensar → pienso；cerrar → cierro；entender → entiendo；querer → quiero</li>
+<li><b>o → ue</b>：poder → puedo；dormir → duermo；volver → vuelvo；contar → cuento</li>
+<li><b>e → i</b>（只限 -ir 动词）：pedir → pido；servir → sirvo；repetir → repito；seguir → sigo</li>
+<li><b>u → ue</b>（唯一一个）：jugar → juego</li>
+</ul>
+<p>四种交替各挑一个代表，排成整表最直观 —— 六个人称里<b>只有 nosotros / vosotros 保持原样</b>，其余四个正好是重读词干的人称：</p>
+{{G:pensar,poder,pedir,jugar|p}}
+<p>同一个交替会一并带进虚拟式现在时，同样<b>不进</b> nosotros / vosotros：</p>
+{{G:pensar,poder,pedir,jugar|sp}}
+<h3>2 · -ir 动词在第三人称的额外变化</h3>
+<p><span class="es">-ir</span> 动词在简单过去时和虚拟式里，第三人称还会再变一次元音：</p>
+<ul>
+<li>e → i：pedir → pidió / pidieron；sentir → sintió / sintieron；repetir → repitió / repitieron</li>
+<li>o → u：dormir → durmió / durmieron；morir → murió / murieron</li>
+</ul>
+<p>看表最清楚 —— 只有 él / ellos 两格换元音，nosotros / vosotros 反而回到原样（pedimos / pedisteis、dormimos / dormisteis）：</p>
+{{G:pedir,dormir|pr}}
+{{G:pedir,dormir|si}}
+<h3>3 · 强过去式：换掉整个词干</h3>
+<p>这批动词的简单过去时既换词干、又换词尾，而且重音不打在结尾 —— 这正是它们与上面「只换词干元音」最大的区别。十二个动词，分成两排：</p>
+{{G:tener,estar,hacer,decir,venir,poder|pr}}
+{{G:poner,saber,querer,traer,andar,haber|pr}}
+<p>而它们的词干会被虚拟式过去未完成时<b>完整继承</b>（-ra / -se 两种词尾都合法，本程序都判对）：</p>
+{{G:tener,estar,hacer,decir,venir,poder|si}}
+<p>注意以 j 结尾的词干：dije → dije<b>ron</b>（不是 dicieron），而且虚拟式里 j 原样保留：dijera。</p>
+<h3>4 · 不规则过去分词</h3>
+<p>这些动词的过去分词不走 -ado / -ido，要单独记。放进现在完成时里看最直观（顺便验证它们确实要配 haber）：</p>
+{{G:hacer,decir,ver,poner|pp}}
+{{G:escribir,abrir,cubrir,romper|pp}}
+{{G:volver,morir,resolver,devolver|pp}}
+<p>它们同时影响现在完成时、过去完成时、将来完成时和被动语态 —— 一个记错会连错好几处，值得单独整理成表。（imprimir 两种分词都通行：<span class="es">impreso</span> / <span class="es">imprimido</span>，本程序按后者显示。）</p>
+<h3>5 · 记忆策略：按「词干」而不是按「时态」记</h3>
+<ul>
+<li>一个不规则词干往往同时供好几个时态使用：tendr- → tendré、tendría、tendrás…</li>
+<li>派生词跟随原词：tener → mantener / obtener / detener / contener，全是 tengo、tuve、tendré、tendría</li>
+<li>decir 传给 predecir、contradecir；poner 传给 componer、suponer；venir 传给 convenir、prevenir</li>
+</ul>
+<div class="tip">所以遇到没见过的动词，先找它的<b>词根</b>：如果词根是不规则动词，它几乎一定跟着不规则。在本程序里，这类形式统一用橙色标出。</div>`,
+  en:`
+<h3>What this category is</h3>
+<p>Here the <b>vowel or consonant of the stem</b> changes, so the pronunciation really does change — quite unlike the spelling-change group. The test is simple: does the verb keep the same stem across persons and tenses?</p>
+<h3>1 · Stem-vowel alternation: e→ie, o→ue, e→i</h3>
+<p>Only where the stem is stressed (yo, tú, él, ellos); nosotros / vosotros keep the original vowel:</p>
+<ul>
+<li><b>e → ie</b>: pensar → pienso; cerrar → cierro; entender → entiendo; querer → quiero</li>
+<li><b>o → ue</b>: poder → puedo; dormir → duermo; volver → vuelvo; contar → cuento</li>
+<li><b>e → i</b> (<span class="es">-ir</span> verbs only): pedir → pido; servir → sirvo; repetir → repito; seguir → sigo</li>
+<li><b>u → ue</b> (the only one): jugar → juego</li>
+</ul>
+<p>One representative verb per alternation makes it clearest in a full table — of the six persons <b>only nosotros / vosotros keep the original vowel</b>, and the other four are exactly the ones with a stressed stem:</p>
+{{G:pensar,poder,pedir,jugar|p}}
+<p>The same alternation is carried into the present subjunctive as well, and again <b>never</b> into nosotros / vosotros:</p>
+{{G:pensar,poder,pedir,jugar|sp}}
+<h3>2 · Extra changes in the third person of -ir verbs</h3>
+<p>In the preterite and the subjunctive, <span class="es">-ir</span> verbs change the vowel once more in the third person:</p>
+<ul>
+<li>e → i: pedir → pidió / pidieron; sentir → sintió / sintieron; repetir → repitió / repitieron</li>
+<li>o → u: dormir → durmió / durmieron; morir → murió / murieron</li>
+</ul>
+<p>The table says it best — only the él / ellos cells change vowel, while nosotros / vosotros go back to the original (pedimos / pedisteis, dormimos / dormisteis):</p>
+{{G:pedir,dormir|pr}}
+{{G:pedir,dormir|si}}
+<h3>3 · Strong preterites: a whole new stem</h3>
+<p>These verbs take both a new stem and new endings in the preterite, with the stress off the ending — that is the real difference from the “vowel alternation only” group above. Twelve verbs, in two rows:</p>
+{{G:tener,estar,hacer,decir,venir,poder|pr}}
+{{G:poner,saber,querer,traer,andar,haber|pr}}
+<p>The past subjunctive inherits the stem <b>untouched</b> (both the -ra and the -se endings are correct, and this app accepts either):</p>
+{{G:tener,estar,hacer,decir,venir,poder|si}}
+<p>Watch the j-stems: dije → dije<b>ron</b> (not dicieron), and the j survives into the subjunctive: dijera.</p>
+<h3>4 · Irregular past participles</h3>
+<p>These verbs do not form the participle with -ado / -ido, so they must be learnt separately. Seen inside the present perfect (which also confirms they take haber):</p>
+{{G:hacer,decir,ver,poner|pp}}
+{{G:escribir,abrir,cubrir,romper|pp}}
+{{G:volver,morir,resolver,devolver|pp}}
+<p>They show up in the present perfect, pluperfect, future perfect and the passive — one mistake spreads across several tenses, so they deserve a table of their own. (imprimir accepts two participles, <span class="es">impreso</span> / <span class="es">imprimido</span>; this app shows the latter.)</p>
+<h3>5 · Learn by stem, not by tense</h3>
+<ul>
+<li>One irregular stem often serves several tenses: tendr- → tendré, tendría, tendrás…</li>
+<li>Derived verbs follow their base: tener → mantener / obtener / detener / contener, all with tengo, tuve, tendré, tendría</li>
+<li>decir passes on to predecir, contradecir; poner to componer, suponer; venir to convenir, prevenir</li>
+</ul>
+<div class="tip">So when you meet an unfamiliar verb, look for its <b>base verb</b> first: if the base is irregular, the new verb almost certainly is too. In this app these forms are shown in orange.</div>`,
+  lk:[lkRae('tener'), lkRae('pedir'), LK_WIKI_IRR, LK_FUNDEU]
+},
+{
+  k:'accent',
+  t:{zh:'⑧ 重音与重音符：哪几个形式必须写 ´', en:'⑧ Stress and the written accent'},
+  s:{zh:'⑧ 重音与重音符', en:'⑧ Stress & accents'},
+  zh:`
+<h3>重音落在哪：两条默认规则</h3>
+<p>不写重音符时，重音位置由词尾决定：<b>以元音或 -n、-s 结尾的，重音落在倒数第二个音节</b>（ha-blo、can-tas、ha-blan）；<b>以其他辅音结尾的，重音落在最后一个音节</b>（ha-blar、co-mer、vi-vir）。</p>
+<p>重音符（tilde，´）只干一件事：<b>打破这个默认</b>。写了它，重音就落在带符的那个元音上 —— 反过来说，只要看到重音符，就说明这个地方按默认规则读是不对的。</p>
+<div class="tip">做题时的口诀：<b>先按规则读一遍，读出来不对就加符。</b>「到底要不要写重音符」的疑问，绝大多数这样就能解决。</div>
+<h3>变位里要特别注意重音的四处</h3>
+<p><b>1 · 简单过去时的 yo 与 él</b>：<span class="es">-ar</span> 动词写 <span class="es">é / ó</span>（hablé、habló），<span class="es">-er / -ir</span> 动词写 <span class="es">í / ió</span>（comí、comió）。这两个重音符正是「过去」和「现在」在听觉上的分界线：hablo / habló、como / comió。</p>
+{{G:hablar,comer|pr}}
+<p><b>2 · nosotros 的「同形撞车」</b>：现在时和简单过去时的 nosotros 都是 -mos 结尾、写法完全一样（hablamos、comimos），只能靠上下文判断是哪一个。而虚拟式过去未完成时的 nosotros / vosotros 重音落在倒数第三音节，就必须写符了：<span class="es">habláramos、hablarais</span>。</p>
+{{G:hablar|si}}
+<p><b>3 · 词干元音交替只发生在重读词干上</b>：重音落在词干的四个人称（yo、tú、él、ellos）才双元音化；nosotros、vosotros 的重音在词尾，词干保持原样 —— 这就是「靴子」形状的来源。重音变了，元音才跟着变，两件事是绑在一起的。</p>
+{{G:pensar,poder|p}}
+<p><b>4 · 重音落在 i / u 上时必须写符</b>（本程序给这类动词标「重音变化」）：i、u 是闭元音，若重读又与后面的 a、e、o 相连，必须写重音符把两个元音<b>拆成两个音节</b>，否则会被读成一个双元音：actuar → <span class="es">actúo / actúas / actúa / actúan</span>（actuamos 重音在词尾，不写符）；enviar → <span class="es">envío / envías / envía / envían</span>；criar → <span class="es">crío / crías / cría / crían</span>。</p>
+{{G:actuar,enviar|p}}
+<p><span class="es">averiguar</span> 还多一步：在 e、i 前面要写两点（<span class="es">ü</span>）才能保住 u 的读音 —— <span class="es">averigüé、averigüe</span>。</p>
+{{G:averiguar|sp}}
+<h3>命令式加代词：把原来的重音补回来</h3>
+<p>代词粘到动词后面，词变长了，但<b>重音位置不变</b>。重音原本落在最后一个音节，加了代词后被挤到倒数第三、第四音节，就必须补写重音符：dar + me + lo → <span class="es">dámelo</span>；poner + te + lo → <span class="es">ponértelo</span>；levantar + te → <span class="es">levántate</span>。反过来，两音节的形式就不必补：poner + te → <span class="es">ponte</span>、ir + te → <span class="es">vete</span>。</p>
+{{G:levantarse|ia}}
+<h3>将来时与条件式：重音永远在词尾</h3>
+<p>这两个时态用<b>整个不定式</b>加词尾，重音一律落在词尾（hablaré、hablarás…；hablaría、hablarías…），所以规则动词在这里一个重音符都不多写。词干不规则也不影响这一点：tendré、diré 照旧只重读最后一个音节。</p>
+{{G:hablar|f}}
+<h3>和本程序里的三种着色对上号</h3>
+<p>重音符属于<b>拼写层面</b>的调整，所以和正字法变化归在同一套着色里（<b>青色</b>）；橙色的「词干变化」是真的改变了读音，两者性质不同。带「重音变化」标签的动词共 11 个：<span class="es">enviar、continuar、actuar、confiar、prohibir、averiguar、variar、situar、efectuar、criar、guiar</span> —— 它们的共同点就是上面第 4 条。</p>`,
+  en:`
+<h3>Where the stress falls: two default rules</h3>
+<p>With no written accent, the stress position follows from the ending: <b>a word ending in a vowel or in -n / -s takes the stress on the second-to-last syllable</b> (ha-blo, can-tas, ha-blan); <b>a word ending in any other consonant takes it on the last syllable</b> (ha-blar, co-mer, vi-vir).</p>
+<p>The written accent (tilde, ´) does exactly one job: <b>it breaks that default</b>. With the accent, the stress lands on the marked vowel — so an accent always means the default reading would have been wrong.</p>
+<div class="tip">The working rule: <b>read the word by the rules first; if it comes out wrong, write the accent.</b> That settles most “do I need an accent here?” doubts.</div>
+<h3>Four things to watch in the conjugation</h3>
+<p><b>1 · Preterite yo and él</b>: <span class="es">-ar</span> verbs write <span class="es">é / ó</span> (hablé, habló); <span class="es">-er / -ir</span> verbs write <span class="es">í / ió</span> (comí, comió). Those accents are what make the past audible against the present: hablo / habló, como / comió.</p>
+{{G:hablar,comer|pr}}
+<p><b>2 · The nosotros collision</b>: present and preterite nosotros both end in -mos and are written identically (hablamos, comimos), so only context tells them apart. The past subjunctive, by contrast, stresses the third-from-last syllable, so it does need the accent: <span class="es">habláramos, hablarais</span>.</p>
+{{G:hablar|si}}
+<p><b>3 · Stem-vowel changes only happen on a stressed stem</b>: the change appears in the four persons that stress the stem (yo, tú, él, ellos); nosotros and vosotros stress the ending and keep the original vowel — which is where the “boot” shape comes from. Stress and stem move together.</p>
+{{G:pensar,poder|p}}
+<p><b>4 · A stressed i or u must carry an accent</b> (this app tags such verbs “accent change”): i and u are closed vowels, so when one of them is stressed next to a following a, e or o, the accent mark is required to <b>split the two vowels into separate syllables</b> instead of a diphthong: actuar → <span class="es">actúo / actúas / actúa / actúan</span> (actuamos stresses the ending, no accent); enviar → <span class="es">envío / envías / envía / envían</span>; criar → <span class="es">crío / crías / cría / crían</span>.</p>
+{{G:actuar,enviar|p}}
+<p><span class="es">averiguar</span> needs one more step: before e and i the u takes a diaeresis (ü) to keep its sound — <span class="es">averigüé, averigüe</span>.</p>
+{{G:averiguar|sp}}
+<h3>Imperative + pronouns: put the original stress back</h3>
+<p>Attaching pronouns makes the word longer but <b>does not move the stress</b>. When the stress would land on the third- or fourth-from-last syllable, an accent has to be written: dar + me + lo → <span class="es">dámelo</span>; poner + te + lo → <span class="es">ponértelo</span>; levantar + te → <span class="es">levántate</span>. Two-syllable results need nothing: poner + te → <span class="es">ponte</span>, ir + te → <span class="es">vete</span>.</p>
+{{G:levantarse|ia}}
+<h3>Future and conditional: the stress is always on the ending</h3>
+<p>Both tenses build on the <b>whole infinitive</b> plus an ending, so the stress always falls on the ending (hablaré, hablarás…; hablaría, hablarías…). Regular verbs therefore need no extra accents here, and an irregular stem changes nothing: tendré and diré are still stressed on the final syllable.</p>
+{{G:hablar|f}}
+<h3>How this maps onto the three colours</h3>
+<p>An accent mark is a <b>spelling-level</b> adjustment, so it is shown in the same colour as orthographic changes (<b>teal</b>); the orange “stem change” colour means the pronunciation itself changed. Eleven verbs in this app carry the “accent change” tag: <span class="es">enviar, continuar, actuar, confiar, prohibir, averiguar, variar, situar, efectuar, criar, guiar</span> — all of them for reason 4 above.</p>`,
+  lk:[LK_WIKI_ACC, LK_DPD_TILDE, LK_DPD_ACCENT, lkRae('actuar'), lkRae('averiguar')]
+}
+];
+const GUIDE_MAP = {}; GUIDE.forEach((g,i)=>{ GUIDE_MAP[g.k] = i; });
+/* 每个时态对应的讲解页（反馈里的「相关语法」按钮用它跳转） */
+const TENSE_GUIDE = {
+  p:'basics', pr:'past', i:'past', pp:'past', pq:'past',
+  f:'future', fp:'future', c:'subj', cp:'subj',
+  sp:'subj', si:'subj', spt:'subj', sq:'subj',
+  ia:'imperative', in:'imperative',
+};
+const guideTxt = o => (o && (lang()==='en' ? (o.en || o.zh) : o.zh)) || '';
+const guideBody = it => (lang()==='en' ? (it.en || it.zh) : it.zh) || '';
+let GUIDE_CUR = 0;
+function guideShort(k){ const i = GUIDE_MAP[k]; return i == null ? '' : guideTxt(GUIDE[i].s); }
+function guideFull(k){ const i = GUIDE_MAP[k]; return i == null ? '' : guideTxt(GUIDE[i].t); }
+/* 变位表 / 反馈里「这个动词的变位规则」链接：跳到讲解页 */
+function guideLinkBtn(k, cls){
+  if(k == null || GUIDE_MAP[k] == null) return '';
+  return '<button type="button" data-g="'+esc(k)+'"'+(cls?' class="'+cls+'"':'')+'>'
+       + esc(guideShort(k))+'</button>';
+}
+/* ---- 讲解页里的变位网格 ----
+   正文里写 {{G:hablar,poder|p}}（可逗号并列多个动词），渲染成与练习模式
+   「正确答案」同款的六人称网格：同一个 personGrid、同一套着色与高亮。
+   动词必须在本程序词表里（test_tense.js 会把讲解页提到的动词全查一遍）；
+   查不到就整块略过，绝不画一个空表。 */
+function guideGrid(spec){
+  const parts = String(spec).split('|');
+  const tk = (parts[1] || 'p').trim();
+  const t = T[tk];
+  if(!t) return '';
+  const one = name => {
+    const v = byInf[name.trim()];
+    if(!v) return '';
+    const f = forms(v, tk);
+    if(!f) return '';
+    return '<div class="gex">'
+      + '<div class="gex-h"><b class="vb">'+esc(v.i)+'</b>'
+      + '<span class="pill g-'+t.g+'">'+esc(tName(tk))+'</span>'
+      + '<span class="zh">'+esc(meaningOf(v))+'</span></div>'
+      + personGrid(f, null, tk, codesOf(v, tk), true, hlOf(v, tk)) + '</div>';
+  };
+  /* 一行最多 2 个动词：每 2 个包一个 .gexrow（flex，两格平分整行宽），
+     落单的那个独占一行、定宽居中（见 .gex:only-child）。 */
+  const cells = parts[0].split(',').map(one).filter(Boolean);
+  if(!cells.length) return '';
+  const rows = [];
+  for(let i = 0; i < cells.length; i += 2)
+    rows.push('<div class="gexrow">' + cells.slice(i, i+2).join('') + '</div>');
+  return rows.join('');
+}
+const expandGuide = html => String(html || '').replace(/\{\{G:([^}]+)\}\}/g, (m, spec) => guideGrid(spec));
+/* 讲解页正文里出现的所有动词（供测试核对是否都在词表里） */
+function guideVerbs(){
+  const out = [];
+  GUIDE.forEach(it => ['zh', 'en'].forEach(l => {
+    String(it[l] || '').replace(/\{\{G:([^}|]+)\|/g, (m, names) => {
+      names.split(',').forEach(n => { const x = n.trim(); if(x && out.indexOf(x) < 0) out.push(x); });
+    });
+  }));
+  return out;
+}
+function renderGuide(){
+  const it = GUIDE[GUIDE_CUR];
+  $('gd-back').textContent = tr('back');
+  $('gd-prev').textContent = tr('gdPrev');
+  $('gd-next').textContent = tr('gdNext');
+  $('gd-prev').disabled = GUIDE_CUR <= 0;
+  $('gd-next').disabled = GUIDE_CUR >= GUIDE.length - 1;
+  const lk = (it.lk || []).map(l =>
+      '<a href="'+esc(l.u)+'" target="_blank" rel="noopener"><b>'+esc(guideTxt(l.n))+'</b>'
+      + '<span>'+esc(guideTxt(l.d))+'</span><em>'+esc(l.u)+'</em></a>').join('');
+  $('gd-body').innerHTML =
+      '<div class="card"><div class="meta">'+esc(tr('gdCount', GUIDE_CUR+1, GUIDE.length))+'</div>'
+    + '<h2 style="margin:4px 0 12px">'+esc(guideTxt(it.t))+'</h2>'
+    + '<div class="gd">'+expandGuide(guideBody(it))
+    +   (lk ? '<h3>'+esc(tr('gdLinks'))+'</h3><div class="links">'+lk+'</div>' : '')
+    + '</div>'
+    + '<div class="growbox">'+GUIDE.map((g,i)=>'<button type="button" class="chip sm" data-gi="'+i+'"'
+        + (i===GUIDE_CUR ? ' aria-pressed="true"' : '')+'>'+esc(guideTxt(g.s))+'</button>').join('')+'</div>'
+    + '</div>';
+  document.querySelectorAll('#gd-body [data-gi]').forEach(b=>{
+    b.onclick = ()=>{ GUIDE_CUR = +b.dataset.gi; renderGuide(); };
+  });
+}
+/* 主页「变位规则速览」卡片里的 8 个入口 */
+function renderGuideHome(){
+  $('h-guide').textContent = tr('hGuide');
+  $('m-guide-open').textContent = tr('guideOpen');
+  $('m-guide-hint').textContent = tr('guideHint');
+  $('m-guide').innerHTML = GUIDE.map((g,i)=>
+      '<button type="button" class="chip sm" data-gi="'+i+'">'+esc(guideTxt(g.s))+'</button>').join('');
+  document.querySelectorAll('#m-guide [data-gi]').forEach(b=>{
+    /* 从主页进的讲解页，返回时一律回主页 */
+    b.onclick = ()=> openGuide(GUIDE[+b.dataset.gi].k, 'scr-menu');
+  });
+}
+$('gd-prev').onclick = ()=>{ if(GUIDE_CUR>0){ GUIDE_CUR--; renderGuide(); } };
+$('gd-next').onclick = ()=>{ if(GUIDE_CUR<GUIDE.length-1){ GUIDE_CUR++; renderGuide(); } };
+
+/* ============================================================
+   右栏：变位表（查询模式）
+   原先是一个「下拉框选动词」的独立页；现在改成随时可拉开 / 收回的右栏：
+   顶部查询框（原形 / 变位形式 / 释义都能搜），下面是完整变位表。
+   ============================================================ */
+/* 每个语式按「左简单 / 右复合」两栏排（命令式则是 肯定 / 否定）。
+   null = 该位置留空：简单过去时的复合时态是「前过去时」(hube hablado)，
+   现代西语已基本不用，数据里也没有，所以位置空着。 */
+const TBL_ROWS = [
+  {g:'ind',  rows:[['p','pp'], ['pr',null], ['i','pq'], ['f','fp']]},
+  {g:'cond', rows:[['c','cp']]},
+  {g:'sub',  rows:[['sp','spt'], ['si','sq']]},
+  {g:'imp',  rows:[['ia','in']], cap:true},
+];
+/* 右栏当前展示的动词 / 高亮位置（时态键 + 人称下标） */
+let DW_VERB = 'hablar', DW_HI = null, DW_OPEN = false;
+const q1 = sel => (document.querySelector ? document.querySelector(sel) : null);
+/* 变位形式 → 动词（惰性构建：输入变位形式也能查到它属于哪个动词） */
+let FORM_IDX = null;
+function buildFormIdx(){
+  if(FORM_IDX) return FORM_IDX;
+  FORM_IDX = new Map();
+  VERBS.forEach(v => TENSES.forEach(t => {
+    const f = forms(v, t.k); if(!f) return;
+    f.forEach((x, i) => {
+      const key = norm(x);
+      if(key && !FORM_IDX.has(key)) FORM_IDX.set(key, {i:v.i, k:t.k});
+    });
+  }));
+  return FORM_IDX;
+}
+/* 查询：按「原形 → 释义 → 变位形式」的优先顺序找，最多给 12 条建议 */
+function searchVerbs(q){
+  const s = norm(q);
+  if(!s) return [];
+  const out = [], seen = new Set();
+  const add = (v, formKey, k) => {
+    if(!v || seen.has(v.i) || out.length >= 24) return;
+    seen.add(v.i); out.push({v, form: formKey || '', tk: k || ''});
+  };
+  VERBS.forEach(v => { if(v.i.indexOf(s) === 0) add(v); });          /* 原形前缀 */
+  VERBS.forEach(v => { if(v.i.indexOf(s) > 0) add(v); });            /* 原形包含 */
+  VERBS.forEach(v => {                                              /* 中文 / 英文释义 */
+    if(((v.z || '') + ' ' + (v.e || '')).toLowerCase().indexOf(s) >= 0) add(v);
+  });
+  const idx = buildFormIdx();                                       /* 变位形式 */
+  for(const [k, hit] of idx){
+    if(k.indexOf(s) !== 0) continue;
+    if(seen.has(hit.i)) continue;
+    add(byInf[hit.i], k, hit.k);
+    if(out.length >= 24) break;
+  }
+  return out;
+}
+/* ---- 查询框的建议列表 ---- */
+let SUG_LIST = [], SUG_I = -1;
+function hideSug(){
+  SUG_LIST = []; SUG_I = -1;
+  const b = $('dw-sug'); if(b){ b.classList.add('hidden'); b.innerHTML = ''; }
+  const q = $('dw-q');  if(q) q.setAttribute('aria-expanded', 'false');
+}
+function paintSug(){
+  document.querySelectorAll('#dw-sug button').forEach((b, i) => b.classList.toggle('cur', i === SUG_I));
+}
+function renderSug(){
+  const box = $('dw-sug'), inp = $('dw-q');
+  if(!box || !inp) return;
+  const q = inp.value.trim();
+  if(!q || norm(q) === norm(DW_VERB)){ hideSug(); return; }    /* 已经就是这个动词，不必再提示 */
+  const list = searchVerbs(q);
+  SUG_LIST = list.slice(0, 12); SUG_I = -1;
+  box.innerHTML = SUG_LIST.length
+    ? SUG_LIST.map(x =>
+        '<button type="button" data-v="'+esc(x.v.i)+'">'
+        + '<span class="iv">'+esc(x.v.i)+'</span>'
+        + '<span class="iz">'+esc(meaningOf(x.v))+'</span>'
+        + (x.form ? '<span class="ih">'+esc(x.form + ' · ' + tName(x.tk))+'</span>' : '')
+        + '</button>').join('')
+      + (list.length > SUG_LIST.length
+          ? '<div class="none">'+esc(tr('sugMore', list.length - SUG_LIST.length))+'</div>' : '')
+    : '<div class="none">'+esc(tr('sugNone', q))+'</div>';
+  box.classList.remove('hidden');
+  inp.setAttribute('aria-expanded', 'true');
+  document.querySelectorAll('#dw-sug button').forEach(b => {
+    const go = e => { if(e && e.preventDefault) e.preventDefault(); pickSug(b.dataset.v); };
+    b.onmousedown = go;      /* 按下即选：抢在输入框失焦之前 */
+    b.onclick = go;
+  });
+}
+function pickSug(inf){ if(inf && byInf[inf]) openTable(inf); }
+function sugKey(e){
+  if(!SUG_LIST.length) return false;
+  if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+    SUG_I = (e.key === 'ArrowDown') ? Math.min(SUG_I + 1, SUG_LIST.length - 1)
+                                    : Math.max(SUG_I - 1, 0);
+    paintSug();
+    return true;
+  }
+  if(e.key === 'Enter'){
+    const x = SUG_LIST[SUG_I >= 0 ? SUG_I : 0];
+    if(x) pickSug(x.v.i);
+    return true;
+  }
+  if(e.key === 'Escape'){ hideSug(); return true; }
+  return false;
+}
+/* ---- 抽屉的开合 ---- */
+function setDrawer(on){
+  DW_OPEN = !!on;
+  const b = $('app-body'); if(b) b.classList.toggle('dw-open', DW_OPEN);
+  const tab = $('dw-tab');  if(tab) tab.setAttribute('aria-expanded', DW_OPEN ? 'true' : 'false');
+  const dw  = $('dw');      if(dw)  dw.setAttribute('aria-hidden', DW_OPEN ? 'false' : 'true');
+  if(!DW_OPEN) hideSug();
+}
+const toggleDrawer = () => setDrawer(!DW_OPEN);
+const closeDrawer  = () => setDrawer(false);
+/* 打开右栏看变位表。hi = {t:时态键, p:人称下标} 时，把那一块高亮并滚到眼前 */
+function openTable(inf, hi){
+  if(inf && byInf[inf]) DW_VERB = inf;
+  if(!byInf[DW_VERB]) DW_VERB = (VERBS[0] || {}).i;
+  DW_HI = (hi && T[hi.t]) ? {t:hi.t, p:(hi.p == null ? null : +hi.p)} : null;
+  const inp = $('dw-q'); if(inp) inp.value = DW_VERB;
+  hideSug();
+  renderTable();
+  setDrawer(true);
+  const box = $('t-body'), el = q1('#t-body .dwb.hi');
+  if(DW_HI && box && el && typeof el.offsetTop === 'number')
+    box.scrollTop = Math.max(0, el.offsetTop - box.offsetTop - 8);
+}
+/* 一个时态块：时态名 + 六个人称（右栏里一人称一行） */
+function tblBlock(v, k){
+  if(!k)   /* 留空位：前过去时 hube + 分词 */
+    return '<div class="dwb none"><div class="dwb-h">—</div>'
+         + '<div class="dwb-none">'+esc(tr('tblGap'))+'</div></div>';
+  const t  = T[k];
+  const hi = DW_HI && DW_HI.t === k;
+  const hiSet = (hi && DW_HI.p != null) ? new Set([DW_HI.p]) : null;
+  return '<div class="dwb tg-block' + (hi ? ' hi' : '') + '">'
+    + '<div class="dwb-h"><span class="pill g-'+t.g+'">'+esc(tName(k))+'</span>'
+    + '<span class="es">'+esc(t.es)+'</span></div>'
+    + personGrid(forms(v, k), hiSet, k, codesOf(v, k), true, hlOf(v, k))
+    + '</div>';
+}
+function renderTable(){
+  const body = $('t-body'); if(!body) return;
+  const v = byInf[DW_VERB] || VERBS[0];
+  if(!v){ body.innerHTML = ''; return; }
+  DW_VERB = v.i;
+  const cnt = $('dw-cnt'); if(cnt) cnt.textContent = tr('dwCount', VERBS.length);
+  let h = '<div class="dwh"><span class="vb">'+esc(v.i)+'</span><span class="lv pill">'+esc(v.l)+'</span></div>'
+    + '<div class="zh dwz">'+esc(meaningOf(v))+'</div>';
+  if(v.g && v.g.length)
+    h += '<div class="dwtag">'+v.g.map(x=>'<span class="tag">'+esc(tagName(x))+'</span>').join('')+'</div>';
+  h += formLegend();
+  h += '<p class="hint" style="margin:8px 0 0">'+esc(tr('dwHint'))+'</p>';
+  TBL_ROWS.forEach(gp => {
+    const n = gp.rows.reduce((a, r) => a + r.filter(Boolean).length, 0);
+    h += '<div class="card tcard dwg g-'+gp.g+'">'
+      + '<h2 class="dwg-h"><span class="nm">'+esc(gName(gp.g))+'</span> '
+      + '<span class="es">'+esc(gEs(gp.g))+'</span><span class="cnt">'+n+'</span></h2>'
+      + '<div class="dwg-cap"><span>'+esc(tr(gp.cap ? 'affirm' : 'simple'))+'</span>'
+      + '<span>'+esc(tr(gp.cap ? 'negative' : 'compound'))+'</span></div>';
+    gp.rows.forEach(r => {
+      h += '<div class="dwp">' + tblBlock(v, r[0]) + tblBlock(v, r[1]) + '</div>';
+    });
+    h += '</div>';
+  });
+  h += '<div class="tfoot"><span class="meta">'+esc(tr('tblAuth'))+'</span>'
+    +  '<a href="https://dle.rae.es/'+encodeURIComponent(v.i)+'?m=form" target="_blank" rel="noopener">'
+    +   esc(tr('tblRae'))+'</a>'
+    +  ' · <button type="button" data-g="basics">'+esc(tr('guideShortBtn'))+'</button></div>';
+  body.innerHTML = h;
+  document.querySelectorAll('#t-body [data-g]').forEach(b=>{
+    b.onclick = ()=>{ closeDrawer(); openGuide(b.dataset.g); };
+  });
+}
+
+/* ============================================================
+   导航
+   ============================================================ */
+/* 讲解页可以从中途进入（做题时点「相关语法」），所以记住来路，返回时回到原屏 */
+let CUR_SCREEN = 'scr-menu', GUIDE_BACK = 'scr-menu';
+function show(id){
+  CUR_SCREEN = id;
+  ['scr-menu','scr-practice','scr-stats','scr-guide']
+    .forEach(x=>$(x).classList.toggle('hidden', x!==id));
+  closeDrawer();                       /* 右栏是浮层：换屏时一并收起 */
+  window.scrollTo(0,0);
+}
+function openGuide(k, back){
+  if(CUR_SCREEN !== 'scr-guide') GUIDE_BACK = back || CUR_SCREEN;
+  const i = GUIDE_MAP[k];
+  if(i != null) GUIDE_CUR = i;
+  else if(GUIDE_CUR < 0 || GUIDE_CUR >= GUIDE.length) GUIDE_CUR = 0;
+  renderGuide();
+  show('scr-guide');
+}
+$('m-start').onclick = ()=>{
+  SESS = {history:[], cur:-1, right:0, done:0, recent:[]};
+  const q = makeQuestion();
+  if(!q){ alert(tr('emptyPoolAlert')); return; }
+  SESS.history.push(q); SESS.cur = 0;
+  show('scr-practice'); renderPractice();
+};
+$('m-stats-btn').onclick = ()=>{ renderStats(); show('scr-stats'); };
+$('p-exit').onclick = ()=>{
+  if(SESS.done && !confirm(tr('endConfirm', SESS.done, Math.round(SESS.right/SESS.done*100)))) return;
+  renderMenu(); show('scr-menu');
+};
+$('p-prev').onclick = ()=>{ if(SESS.cur>0){ SESS.cur--; renderPractice(); } };
+/* 中文释义开关：只把那一行改成「隐形」，不重绘整屏。
+   重绘会连带清掉已经敲进去的答案、并把「看原形」揭开的原形重新盖回去，
+   而且整屏重建时高度会跳一下（现在释义行固定占位，所以就地切换即可）。 */
+$('p-zh').onclick = ()=>{
+  DB.settings.showZh = !DB.settings.showZh; saveDB();
+  const on = DB.settings.showZh;
+  const line = document.querySelector('#p-body .qbox .zh-line');
+  if(line) line.classList.toggle('off', !on);
+  $('p-zh').textContent = on ? tr('zhOn') : tr('zhOff');
+  $('p-zh').style.color = on ? 'var(--accent)' : '';
+};
+$('s-back').onclick = ()=>{ renderMenu(); show('scr-menu'); };
+/* 右栏变位表：拉手 / 关闭 / 遮罩 / 查询框 */
+$('dw-tab').onclick = ()=>{ if(DW_OPEN) closeDrawer(); else openTable(DW_VERB); };
+$('dw-close').onclick = closeDrawer;
+$('dw-scrim').onclick = closeDrawer;
+/* 遮罩挡住背后页面的滚动（但不锁 body 的 overflow，免得滚动条忽隐忽现把正文挤一下） */
+const scrimHold = e => { if(e.cancelable) e.preventDefault(); };
+$('dw-scrim').addEventListener('wheel', scrimHold, {passive:false});
+$('dw-scrim').addEventListener('touchmove', scrimHold, {passive:false});
+$('dw-q').oninput = ()=>{ SUG_I = -1; renderSug(); };
+$('dw-q').onkeydown = e => { sugKey(e); };
+$('dw-q').onfocus = ()=>{ renderSug(); };
+$('dw-q').onblur = ()=>{ setTimeout(hideSug, 160); };
+/* 做题途中也能随手拉开右栏看当前动词的变位 */
+$('p-table').onclick = ()=>{
+  const q = SESS.history[SESS.cur];
+  openTable(q ? q.inf : DW_VERB, q ? {t:(q.mode==='shift'? q.tense2 : q.tense), p:q.person} : null);
+};
+$('m-guide-open').onclick = ()=> openGuide(GUIDE[GUIDE_CUR] ? GUIDE[GUIDE_CUR].k : 'basics', 'scr-menu');
+$('gd-back').onclick = ()=>{ show(GUIDE_BACK === 'scr-guide' ? 'scr-menu' : GUIDE_BACK); };
+
+loadDB();
+applyStatic();
+renderMenu();
+renderTable();
+</script>
+</body>
+</html>
