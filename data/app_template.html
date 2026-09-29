@@ -654,7 +654,6 @@ const IMP_ORD   = {1:{zh:'第二人称单数',en:'2nd person singular'},
                    5:{zh:'第二人称复数（诸位）',en:'2nd person plural (polite)'}};
 /* 命令式用专属标签，其余时态用通用标签 */
 const personLabel  = (i,k) => isImp(k) ? IMP_LABEL[i] : PERSONS[i].l;
-const personShort  = (i,k) => isImp(k) ? IMP_LABEL[i] : PERSONS[i].sl;
 const personGlossI = (i,k) => isImp(k) ? (lang()==='en'?IMP_GLOSS[i].en:IMP_GLOSS[i].zh)
                                       : (lang()==='en'?PERSONS[i].E:PERSONS[i].gl);
 const personOrdI   = (i,k) => isImp(k) ? (lang()==='en'?IMP_ORD[i].en:IMP_ORD[i].zh)
@@ -1801,18 +1800,18 @@ function renderPractice(){
         + infLine + zhLine
         + '<div class="verb-big" style="margin:10px 0 4px">'+esc(q.answer)+'</div>'
         + '</div>';
-    /* 人称选项：第一行单数、第二行复数，一行三个人称；窄屏自动换成短标签
-       命令式没有 yo，只出 5 个人称，且用 usted / ustedes 而非 él / ella / ellos */
-    const imp = isImp(q.tense);
-    const mkOpt = i => '<button class="opt" data-pick="'+i+'" title="'+esc(personLabel(i,q.tense)+' · '+personOrdI(i,q.tense))+'">'
-        + '<span class="pol"><span class="w">'+esc(personLabel(i,q.tense))+'</span>'
-        + '<span class="s">'+esc(personShort(i,q.tense))+'</span></span>'
-        + '<small>'+esc(personGlossI(i,q.tense))+'</small></button>';
-    const row1 = imp ? [1,2,3] : PERS_ROW1;   // 命令式：tú / usted / nosotros
-    const row2 = imp ? [4,5]   : PERS_ROW2;   // 命令式：vosotros / ustedes
+    /* 人称选项：第一行单数、第二行复数，一行三个人称；窄屏自动换成短标签。
+       所有时态（含命令式）一律给足 6 个人称、用通用标签——不要删 yo：
+       ① 高亮/键盘/回显都按「选项位置 = 人称下标」对齐，砍成 5 个会整体错位；
+       ② hable 这类同形形式也可以是虚拟式的 yo，少了 yo 就答不了这种读法。
+       同形多答案由 formHits 判定兜底（见 submitAnswer 的 recognize 分支）。 */
+    const mkOpt = i => '<button class="opt" data-pick="'+i+'" title="'+esc(PERSONS[i].l+' · '+personOrd(i))+'">'
+        + '<span class="pol"><span class="w">'+esc(PERSONS[i].l)+'</span>'
+        + '<span class="s">'+esc(PERSONS[i].sl)+'</span></span>'
+        + '<small>'+esc(personGloss(i))+'</small></button>';
     body += '<div class="opts persons" id="p-persons">'
-        + '<div class="orow">'+row1.map(mkOpt).join('')+'</div>'
-        + '<div class="orow">'+row2.map(mkOpt).join('')+'</div>'
+        + '<div class="orow">'+PERS_ROW1.map(mkOpt).join('')+'</div>'
+        + '<div class="orow">'+PERS_ROW2.map(mkOpt).join('')+'</div>'
         + '</div>';
     if(DB.settings.askTense){
       body += '<div class="tpick" id="p-tenses"></div>';
@@ -1930,7 +1929,7 @@ function renderPractice(){
     if(q.mode==='recognize'){
       const can = selP !== null && (!DB.settings.askTense || selT !== null);
       goBtn.disabled = !can && !answerLocked;
-      document.querySelectorAll('#p-persons .opt').forEach((b,i)=>b.classList.toggle('sel', i===selP));
+      document.querySelectorAll('#p-persons .opt').forEach(b=>b.classList.toggle('sel', +b.dataset.pick===selP));
       document.querySelectorAll('#p-tenses .chip').forEach(b=>b.setAttribute('aria-pressed', b.dataset.tense===selT));
     } else if(DB.settings.inputMode==='choice'){
       goBtn.disabled = !q.pickChoice && !answerLocked;
@@ -1949,10 +1948,11 @@ function renderPractice(){
       const hits = q.hits || (q.hits = formHits(v, q.answer));
       const okP = new Set(hits.map(x=>x.p));
       const okK = new Set(hits.map(x=>x.k));
-      document.querySelectorAll('#p-persons .opt').forEach((b,i)=>{
-        if(okP.has(i)) b.classList.add('rev-ok');
-        else if(i === q.pickPerson) b.classList.add('rev-bad');
-        if(i === q.pickPerson) b.classList.remove('sel');
+      document.querySelectorAll('#p-persons .opt').forEach(b=>{
+        const p = +b.dataset.pick;
+        if(okP.has(p)) b.classList.add('rev-ok');
+        else if(p === q.pickPerson) b.classList.add('rev-bad');
+        if(p === q.pickPerson) b.classList.remove('sel');
       });
       document.querySelectorAll('#p-tenses .chip').forEach(b=>{
         const k = b.dataset.tense;
@@ -2002,7 +2002,7 @@ function renderPractice(){
       return;
     }
     if(cur && cur.mode==='recognize' && cur.correct===null && e.key>='1' && e.key<='6'){
-      const b = document.querySelectorAll('#p-persons .opt')[+e.key-1]; if(b) b.click();
+      const b = document.querySelector('#p-persons .opt[data-pick="'+(+e.key-1)+'"]'); if(b) b.click();
     }
   };
 

@@ -435,6 +435,21 @@
   qH = mkRec('hablar','p',2,false);
   ck('habla(现在时 él) 判 tú 也为对', answerRec(qH,1,null), true);
 
+  /* 命令式 ↔ 虚拟式现在时同形：hable = 肯定命令式 usted = 虚拟式 yo/usted；
+     hablemos（nosotros）、hablen（ustedes）同理 —— 哪一种真实读法都算对 */
+  ck('formHits hable = 命令式 usted + 虚拟式 yo/usted',
+     hitsOf('hablar','hable').sort(), ['0|sp','2|ia','2|sp'].sort());
+  qH = mkRec('hablar','ia',2,true);   // 题目：肯定命令式 usted「hable」
+  ck('命令式题：答「虚拟式 + usted」判对', answerRec(qH,2,'sp'), true);
+  qH = mkRec('hablar','ia',2,true);
+  ck('命令式题：答「虚拟式 + yo」也判对', answerRec(qH,0,'sp'), true);
+  qH = mkRec('hablar','sp',0,true);   // 反向：虚拟式 yo「hable」
+  ck('虚拟式题：答「肯定命令式 + usted」判对', answerRec(qH,2,'ia'), true);
+  qH = mkRec('hablar','ia',3,false);  // hablemos：命令式 nosotros = 虚拟式 nosotros
+  ck('hablemos 答 nosotros 判对（不问时态）', answerRec(qH,3,null), true);
+  qH = mkRec('hablar','ia',3,true);
+  ck('hablemos 答「虚拟式 + nosotros」也判对', answerRec(qH,3,'sp'), true);
+
   /* 回看已答题目：同形的读法都标绿 */
   qH = mkRec('comprar','pr',3,true);
   answerRec(qH,3,'p');
@@ -957,23 +972,28 @@
      [...pgi.querySelectorAll('.prow')[1].querySelectorAll('.pl')].map(e=>e.textContent),
      ['vosotros','ustedes']);
 
-  /* 命令式辨认选项：只有 5 个人称，用 usted / ustedes 而非 él / ella / ellos / ellas */
+  /* 命令式辨认选项：与其他时态完全一致 —— 6 个人称、通用标签（yo 保留：
+     hable 这类同形形式也可能是虚拟式的 yo，删了就没法答这种读法） */
   const qPiO = mkRec('hablar','ia',2,false);   // usted 形式
   const piRows = [...document.querySelectorAll('#p-persons .orow')];
   const piOpts = [...document.querySelectorAll('#p-persons .opt')];
-  ck('命令式辨认：选项只有 5 个（无 yo）', piOpts.length, 5);
-  ck('命令式辨认：data-pick 是 1–5', piOpts.map(b=>b.dataset.pick), ['1','2','3','4','5']);
-  ck('命令式辨认：标签是 tú/usted/nosotros/vosotros/ustedes',
-     piOpts.map(b=>b.querySelector('.pol .w').textContent),
-     ['tú','usted','nosotros','vosotros','ustedes']);
-  ck('命令式辨认：不出现 él / ella / ellos / ellas',
-     piOpts.every(b=>!/él|ella|ellos|ellas/.test(b.textContent)), true);
-  ck('命令式辨认：第一行单数 tú/usted/nosotros',
+  ck('命令式辨认：选项与其他时态一致（6 个，含 yo）', piOpts.length, 6);
+  ck('命令式辨认：data-pick 是 0–5', piOpts.map(b=>b.dataset.pick), ['0','1','2','3','4','5']);
+  ck('命令式辨认：第一行 yo/tú/él, ella, usted',
      [...piRows[0].querySelectorAll('.opt .pol .w')].map(e=>e.textContent),
-     ['tú','usted','nosotros']);
-  ck('命令式辨认：第二行 vosotros/ustedes',
+     ['yo','tú','él / ella / usted']);
+  ck('命令式辨认：第二行 nosotros/vosotros/ellos, ellas, ustedes',
      [...piRows[1].querySelectorAll('.opt .pol .w')].map(e=>e.textContent),
-     ['vosotros','ustedes']);
+     ['nosotros / nosotras','vosotros / vosotras','ellos / ellas / ustedes']);
+  /* 点击哪个键就点亮哪个键（sel 落在被点选项的 data-pick 上，不得错位） */
+  piOpts[2].click();
+  ck('命令式辨认：点亮的就是点击的那个键',
+     [...document.querySelectorAll('#p-persons .opt')]
+       .filter(b=>b.classList.contains('sel')).map(b=>b.dataset.pick), ['2']);
+  piOpts[4].click();
+  ck('命令式辨认：换点另一个键，高亮跟着走',
+     [...document.querySelectorAll('#p-persons .opt')]
+       .filter(b=>b.classList.contains('sel')).map(b=>b.dataset.pick), ['4']);
   /* 命令式辨认选 usted 判定正确（点 data-pick=2） */
   ck('命令式辨认：选 usted 判对', answerRec(qPiO, 2, null), true);
 
