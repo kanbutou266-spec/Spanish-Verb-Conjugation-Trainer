@@ -1,5 +1,9 @@
 # 西语动词变位练习器 · Spanish Verb Conjugation Trainer
 
+## 写在前面
+- 本人是一位西语小白，目前正处于被西语动词变位折磨的状态，发现网上的西语变位训练app/软件要么是付费的，要么练习不够到位。本着敢为天下先的理念，我直接就是一个vibe coding，很快啊。经过和大肥鱼的十几次周旋，处理了几十个bug和不满意之处，终于，集入门、训练、词典于一身的西语动词变位练习器1.0诞生了。
+- 目前虽然有英文模式，但是还没有来得及看排版，如果外国友人对排版有什么建议，我会很乐意继续修改。 Although there is already an English mode, I currently don't have enough time to check its layout. If any native English speaker has any suggestions, I would be willing to fix them in the future. 
+
 **中文** ｜ [English](#english)
 
 > **AI 参与声明 / AI Disclosure**：本作品在开发过程中使用了 GPT（生成式 AI）辅助参与代码编写、测试与文档撰写，并经人工设计、审校与验证。/ This project was developed with the assistance of GPT (generative AI) for code, testing, and documentation, with human design, review, and verification.
