@@ -10,7 +10,7 @@
 
 | 微信赞赏 | 
 |:--------:|
-|![微信赞赏](./data/donation_code.png)|
+|<img src="./data/donation_code.png" width="200">|
 
 **中文** ｜ [English](#english)
 
