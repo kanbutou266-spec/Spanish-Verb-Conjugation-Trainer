@@ -2,7 +2,15 @@
 
 ## 写在前面
 - 本人是一位西语小白，目前正处于被西语动词变位折磨的状态，发现网上的西语变位训练app/软件要么是付费的，要么练习不够到位。本着敢为天下先的理念，我直接就是一个vibe coding，很快啊。经过和大肥鱼的十几次周旋，处理了几十个bug和不满意之处，终于，集入门、训练、词典于一身的西语动词变位练习器1.0诞生了。
-- 目前虽然有英文模式，但是还没有来得及看排版，如果外国友人对排版有什么建议，我会很乐意继续修改。 Although there is already an English mode, I currently don't have enough time to check its layout. If any native English speaker has any suggestions, I would be willing to fix them in the future. 
+- 目前虽然有英文模式，但是还没有来得及看排版，如果外国友人对排版有什么建议，我会很乐意继续修改。 Although there is already an English mode, I currently don't have enough time to check its layout. If any native English speaker has any suggestions, I would be willing to fix them in the future.
+
+- ## 💝 支持本项目
+如果本项目对你有帮助，可以请作者的大肥鱼吃高级鱼饲料，所有赞助全部用于项目维护。
+> 提示：**纯属自愿赞助，项目本身完全免费，不会因为不赞助而限制任何功能**。
+
+| 微信赞赏 | 
+|:--------:|
+|![微信赞赏](./donation_code.png)|
 
 **中文** ｜ [English](#english)
 
