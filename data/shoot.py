@@ -6,27 +6,37 @@
     python shoot.py guide_intro table_color
     python shoot.py --size=420,1200 drawer_narrow
 输出: _t/shots/<case>.png
+
+运行器是 data/run_headless.js（Playwright 自带 Chromium）—— 本机 Edge 升到 154
+后 --headless --screenshot 静默失效，截图链路同样切走。
 """
-import io, os, subprocess, sys
+import os, subprocess, sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 APPDIR = os.path.abspath(os.path.join(ROOT, ".."))
 OUT = os.path.join(APPDIR, "_t")
 SHOTS = os.path.join(OUT, "shots")
 
+NODE_CANDIDATES = [
+    os.path.expanduser(r"~\.workbuddy\binaries\node\versions\22.22.2-3\node.exe"),
+    r"C:\Users\31796\AppData\Local\pi-node\current\node.exe",
+]
 
-def find_edge():
-    for p in (r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-              r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"):
+
+def find_node():
+    for p in NODE_CANDIDATES:
         if os.path.exists(p):
             return p
-    return None
+    for d in os.environ.get("PATH", "").split(os.pathsep):
+        for name in ("node.exe", "node"):
+            p = os.path.join(d, name)
+            if os.path.exists(p):
+                return p
+    return "node"
 
 
 def main():
-    edge = find_edge()
-    if not edge:
-        print("找不到 Edge"); return 1
+    node = find_node()
     if not os.path.isdir(SHOTS):
         os.makedirs(SHOTS)
     size = "1280,2400"
@@ -40,17 +50,16 @@ def main():
                    if f.endswith(".html") and not f.startswith("_"))
     if want:
         cases = [c for c in cases if c in want]
+    runner = os.path.join(ROOT, "run_headless.js")
     for c in cases:
         page = os.path.join(OUT, c + ".html")
         png = os.path.join(SHOTS, c + ".png")
-        url = "file:///" + page.replace("\\", "/")
-        subprocess.run([edge, "--headless=new", "--disable-gpu", "--no-sandbox",
-                        "--hide-scrollbars", "--force-device-scale-factor=1",
-                        "--window-size=" + size, "--virtual-time-budget=20000",
-                        "--screenshot=" + png, url],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                       cwd=APPDIR, timeout=180)
-        print(("OK  " if os.path.exists(png) else "FAIL") + " " + png)
+        r = subprocess.run([node, runner, page, "shot", png, size],
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", cwd=ROOT, timeout=180)
+        ok = os.path.exists(png)
+        print(("OK  " if ok else "FAIL") + " " + png
+              + ("" if ok else "  " + ((r.stdout or "") + (r.stderr or ""))[:200]))
     return 0
 
 

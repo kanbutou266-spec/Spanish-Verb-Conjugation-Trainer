@@ -20,6 +20,12 @@
   const rowChips = r => [...r.querySelectorAll('.chip')].map(b => b.textContent.trim());
   const chipsOf = g => [...g.querySelectorAll('.chip')].map(b => b.textContent.trim());
 
+  /* 时态 / 等级这些控件住在「自定义」的编辑模态里：先把它打开画出来 */
+  function openPick(){
+    openCustomModal('custom1');
+  }
+  openPick();
+
   /* 1. 清空 */
   document.getElementById('m-t-none').click();
   ck('清空后 tenses 为空', DB.settings.tenses, []);
@@ -154,11 +160,13 @@
   DB.settings.tagFilter='';
   const oneVerb = (()=>{ for(const v of VERBS){ if(v.l==='A1' && v.t.p) return v; } })();
   ck('找得到一个 A1 动词', !!oneVerb, true);
-  DB.stats.verbs[oneVerb.i] = {att:1, err:1, byT:{}, last:Date.now()};
-  DB.settings.onlyWrong = true; syncTenseOrder(); saveDB(); renderMenu();
-  ck('单动词 平移模式给出警告',
-     /平移模式/.test(document.getElementById('m-pool').textContent)
-       && /至少 2 个动词/.test(document.getElementById('m-pool').textContent), true);
+  /* 直接把 VERBS 收缩到只剩这一个动词 —— buildPool = 等级 ∩ 标签 ∩ 时态，
+     没有别的开关能把题库精确锁到 1 个动词（「只练错题」已下线） */
+  const restVerbs = VERBS.splice(0, VERBS.length, oneVerb);
+  DB.settings.levels = ['A1'];
+  syncTenseOrder(); saveDB(); renderMenu();
+  ck('平移模式在单动词题库下给出警告',
+     /至少 2 个动词/.test(document.getElementById('m-pool').textContent), true);
   let mv = 0, mvGot = 0;
   for(let i=0;i<80;i++){
     const q = makeQuestion();
@@ -166,10 +174,11 @@
     mvGot++;
     if(q.mode === 'transfer') mv++;
   }
-  ck('单动词：出的题都不是 transfer', mv, 0);
+  ck('单动词：出的题都不是 transfer（题库只有 1 个动词时）', mv, 0);
   ck('单动词：退回到其他模式仍能出题', mvGot > 0, true);
-  DB.settings.onlyWrong = false; delete DB.stats.verbs[oneVerb.i];
+  VERBS.length = 0; VERBS.push(...restVerbs);   /* 还原词表 */
   syncTenseOrder(); saveDB(); renderMenu();
+  ck('已移除「只练我的错题」设置项', 'onlyWrong' in DB.settings, false);
 
   /* 9. 全 15 时态压力测试 */
   DB.settings.tenses = ALL_TENSE_KEYS.slice(); DB.settings.modes=['recognize','produce','shift'];
@@ -225,16 +234,19 @@
   ck('虚拟式现在时 不重复显示「虚拟式」', moodTagOf('sp'), 1);
   ck('肯定命令式 不重复显示「命令式」', moodTagOf('ia'), 1);
 
-  /* 13. 辨认模式的时态选项框：四组 × 只出与本题同类的时态 */
-  DB.settings = Object.assign(defaultSettings(), {tenses:['p'], modes:['recognize'],
+  /* 13. 辨认模式的时态选项框：四组 × 只出与本题同类的时态
+     选「全部简单时态」——这样 recAskTense 才会返回 true（>1 个同类时态）让选项框渲染，
+     且题目一定是简单时态，下面的断言（只列简单时态）才成立。askTense 已不是可配置项。 */
+  const SIMPLE_T = ALL_TENSE_KEYS.filter(k => !T[k].cp);
+  DB.settings = Object.assign(defaultSettings(), {tenses:SIMPLE_T, modes:['recognize'],
                                                   levels:['A1','A2','B1','B2'],
-                                                  askTense:true, inputMode:'type'});
+                                                  inputMode:'type'});
   syncTenseOrder(); saveDB();
   SESS = {history:[],cur:-1,right:0,done:0,recent:[]};
   let qr = null;
-  for(let i=0;i<80 && !qr;i++){
+  for(let i=0;i<120 && !qr;i++){
     const x = makeQuestion();
-    if(x && x.mode === 'recognize') qr = x;
+    if(x && x.mode === 'recognize' && x.askTense) qr = x;
   }
   ck('出到辨认模式题目', !!qr, true);
   if(qr){
@@ -289,21 +301,26 @@
        boxes.map(b=>b.classList.contains('g-ind')||b.classList.contains('g-cond')
                      ||b.classList.contains('g-sub')||b.classList.contains('g-imp')),
        [true,true,true,true]);
-    /* 选人称 + 现在时后应可提交，且判定正确 */
+    /* 选原形 + 人称 + 现在时后应可提交，且判定正确 */
     const q0 = SESS.history[SESS.cur];
+    const infInp = document.getElementById('p-inf');
+    infInp.value = q0.inf; infInp.dispatchEvent(new Event('input'));   // 手写原形
     document.querySelectorAll('#p-persons .opt')[q0.person].click();
-    boxes[0].querySelectorAll('.chip')[0].click();   // 现在时
-    ck('选人称+时态后确认键可用', document.getElementById('p-go').disabled, false);
-    ck('选中的时态被标记', q0.pickTense, 'p');
+    const chipQ = [...document.querySelectorAll('#p-tenses .chip')]
+                      .find(b=>b.dataset.tense === q0.tense);   // 本题的时态
+    ck('本题时态在选项中', !!chipQ, true);
+    chipQ.click();
+    ck('选原形+人称+时态后确认键可用', document.getElementById('p-go').disabled, false);
+    ck('选中的时态被标记', q0.pickTense, q0.tense);
     document.getElementById('p-go').click();
     ck('简单时态题判定正确', q0.correct, true);
   }
 
-  /* 13b. 复合时态题 → 只出复合选项 */
+  /* 13b. 复合时态题 → 只出复合选项（选全部复合时态，recAskTense 才返回 true 让选项框渲染） */
   let qz = null;
-  DB.settings = Object.assign(defaultSettings(), {tenses:['pp'], modes:['recognize'],
+  DB.settings = Object.assign(defaultSettings(), {tenses:['cp','fp','pp','pq','spt','sq'], modes:['recognize'],
                                                   levels:['A1','A2','B1','B2'],
-                                                  askTense:true, inputMode:'type'});
+                                                  inputMode:'type'});
   syncTenseOrder(); saveDB();
   SESS = {history:[],cur:-1,right:0,done:0,recent:[]};
   for(let i=0;i<80 && !qz;i++){
@@ -336,9 +353,11 @@
     ck('复合题：顶部注明只列复合时态',
        host.querySelector('.fh .note').textContent.includes('复合时态'), true);
     const qz0 = SESS.history[SESS.cur];
+    const qzInf = document.getElementById('p-inf');
+    qzInf.value = qz0.inf; qzInf.dispatchEvent(new Event('input'));   // 手输原形
     document.querySelectorAll('#p-persons .opt')[qz0.person].click();
-    const cc = chips.find(c=>c.dataset.tense === 'pp');
-    ck('复合题：现在完成时在选项中', !!cc, true);
+    const cc = chips.find(c=>c.dataset.tense === qz0.tense);
+    ck('复合题：本题时态在选项中', !!cc, true);
     if(cc) cc.click();
     document.getElementById('p-go').click();
     ck('复合题：判定正确', qz0.correct, true);
@@ -380,20 +399,25 @@
   /* 15. 同形（homograph）判定 —— 现在时 / 简单过去时 的 nosotros 形式完全一样 */
   /* 指定动词+时态+人称造一道辨认题（绕开随机） */
   function mkRec(inf, tense, person, askTense){
-    DB.settings = Object.assign(defaultSettings(), {tenses:[tense], modes:['recognize'],
-        levels:['A1','A2','B1','B2'], askTense:!!askTense, inputMode:'type'});
+    /* 问时态时给同类的全部时态，让选项框里除了本题时态还有对照项（如 compramos 的 p/pr） */
+    const sameCat = ALL_TENSE_KEYS.filter(k => (T[k].cp?1:0) === (T[tense].cp?1:0));
+    DB.settings = Object.assign(defaultSettings(), {tenses: askTense ? sameCat : [tense], modes:['recognize'],
+        levels:['A1','A2','B1','B2'], inputMode:'type'});
     syncTenseOrder(); saveDB();
     const v = byInf[inf], f = forms(v, tense);
     const q = {inf:inf, idx:VERBS.indexOf(v), zh:v.z, g:v.g, lv:v.l, mode:'recognize',
                tense:tense, person:person, answer:f[person], userAnswer:null, correct:null,
-               pickPerson:null, pickTense:null, hits:formHits(v, f[person])};
+               pickPerson:null, pickTense:null, askTense:!!askTense, hits:formHits(v, f[person])};
     SESS = {history:[q], cur:0, right:0, done:0, recent:[]};
     show('scr-practice'); renderPractice();
     return q;
   }
   function answerRec(q, person, tense){
+    /* 辨认模式必须手输原形 + 选人称（+ 选时态），才能提交 */
+    const infInp = document.getElementById('p-inf');
+    if(infInp){ infInp.value = q.inf; infInp.dispatchEvent(new Event('input')); }
     document.querySelector('#p-persons .opt[data-pick="'+person+'"]').click();
-    if(DB.settings.askTense && tense){
+    if(q.askTense && tense){
       const c = [...document.querySelectorAll('#p-tenses .chip')].find(b=>b.dataset.tense===tense);
       if(c) c.click();
     }
@@ -477,7 +501,7 @@
 
   /* 17. 语式分组配色：陈述=蓝 / 条件=青 / 虚拟=紫 / 命令=橙 */
   localStorage.removeItem('es_conj_app_v1');
-  DB.settings = defaultSettings(); renderMenu();
+  DB.settings = defaultSettings(); openPick();
   const GC = {ind:'g-ind', cond:'g-cond', sub:'g-sub', imp:'g-imp'};
   ck('四组卡片各带主题色类',
      TENSE_GROUPS.map(gp=>gByName(gp.zh).classList.contains(GC[gp.k])), [true,true,true,true]);
@@ -542,7 +566,7 @@
   /* 18. 不变量：同一形式不可能既属简单时态又属复合时态
      —— 这是「辨认模式只出同类选项」成立的前提 */
   DB.settings = Object.assign(defaultSettings(), {tenses:ALL_TENSE_KEYS.slice(),
-      modes:['recognize'], levels:['A1','A2','B1','B2'], askTense:true, inputMode:'type'});
+      modes:['recognize'], levels:['A1','A2','B1','B2'], inputMode:'type'});
   syncTenseOrder(); saveDB();
   SESS = {history:[],cur:-1,right:0,done:0,recent:[]};
   let cross = 0, checked = 0, missOpt = 0;
@@ -566,33 +590,38 @@
      19. 隐藏动词原形（辨认 / 转换 / 平移模式生效，复现模式不生效）
      ============================================================ */
   localStorage.removeItem('es_conj_app_v1');
-  DB.settings = defaultSettings(); renderMenu();
-  /* 设置面板是「用不上的项置灰保留」，所以先用一个生效的模式打开它 */
-  DB.settings.modes = ['recognize']; SET_OPEN = true; renderMenu();
-  const optOf = k => [...document.querySelectorAll('#m-opts .chip')]
-                       .filter(b => b.dataset.opt === k)[0];
-  ck('设置面板里有「隐藏动词原形」', !!optOf('hideInf'), true);
-  ck('选项区顺序：中文 / 原形 / 重音…',
-     [...document.querySelectorAll('#m-opts .chip')].map(b=>b.dataset.opt).slice(0,3),
-     ['showZh','hideInf','strictAccent']);
+  DB.settings = defaultSettings(); openPick();
+  /* 选项都搬进右侧设置栏（从页面顶部的「设置」按钮呼出）——这一栏只剩全局项 */
+  document.getElementById('m-set').click();
+  const optOf = k => document.querySelector('#st-body .sw[data-opt="'+k+'"]');
+  ck('设置栏里有「隐藏动词原形」', !!optOf('hideInf'), true);
+  ck('设置栏含四个全局项：隐藏原形 / 含 vosotros / 显示中文释义 / 严格重音',
+     [...document.querySelectorAll('#st-body .sw')].map(b=>b.dataset.opt).sort(),
+     ['hideInf','showZh','strictAccent','vosotros'].sort());
+  ck('「只练我的错题」已下线',
+     document.querySelector('#st-body .sw[data-opt="onlyWrong"]'), null);
+  ck('「显示中文释义」「严格要求重音」已放进齿轮设置栏',
+     !!optOf('showZh') && !!optOf('strictAccent'), true);
+  ck('「辨认问时态」不再是设置项（单时态自动跳过 / 多时态默认问）',
+     document.querySelector('#st-body [data-opt="askTense"]'), null);
+  ck('「答题方式」不在齿轮设置栏（它随每套难度走）',
+     document.querySelector('#st-body [data-opt="inputMode"]'), null);
   ck('默认不隐藏原形', DB.settings.hideInf, false);
-  ck('默认 chip 未按下', optOf('hideInf').getAttribute('aria-pressed'), 'false');
-  ck('关闭时提示说明作用范围',
-     document.getElementById('m-opt-hint').textContent.includes('复现模式'), true);
+  ck('默认开关是关的', optOf('hideInf').getAttribute('aria-pressed'), 'false');
+  ck('选项一律可用，不随模式置灰',
+     [...document.querySelectorAll('#st-body .sw')].every(b => !b.disabled), true);
   optOf('hideInf').click();
   ck('点击后开启隐藏', DB.settings.hideInf, true);
-  ck('开启后 chip 按下', optOf('hideInf').getAttribute('aria-pressed'), 'true');
-  ck('开启后提示说明「原形已隐藏」',
-     document.getElementById('m-opt-hint').textContent.includes('原形已隐藏'), true);
+  ck('开启后开关按下', optOf('hideInf').getAttribute('aria-pressed'), 'true');
 
-  /* 只练复现模式 + 已开启隐藏 → 该项置灰并提示不起作用 */
+  /* 切到复现模式：隐藏原形对这一屏不生效，但选项本身仍然可用（不再置灰） */
   DB.settings = Object.assign(defaultSettings(), {modes:['produce'], hideInf:true, tenses:['p']});
-  SET_OPEN = true; renderMenu();
-  ck('复现模式下该项置灰', optOf('hideInf').disabled, true);
-  ck('复现模式下仍能看到该项（没有消失）', !!optOf('hideInf'), true);
-  ck('复现模式下提示「不起作用」',
-     document.getElementById('m-opt-hint').textContent.includes('不起作用'), true);
-  SET_OPEN = false;
+  DB.activeKey = 'custom1'; renderMenu();
+  ck('复现模式下该项仍可选（不置灰）', optOf('hideInf').disabled, false);
+  ck('复现模式下仍能看到该项', !!optOf('hideInf'), true);
+  ck('说明里写清了「复现模式不受影响」',
+     document.querySelector('#st-body .setrow .st small').textContent.length > 5, true);
+  document.getElementById('st-close').click();
 
   /* 脏数据归一 */
   DB.settings = Object.assign(defaultSettings(), {hideInf:'yes', tenses:['p']}); sanitizeSettings();
@@ -601,53 +630,57 @@
   ck('hideInf 0 → false', DB.settings.hideInf, false);
   ck('defaultSettings 含 hideInf 且默认 false', defaultSettings().hideInf, false);
 
-  /* —— 19a 辨认模式 —— */
+  /* —— 19a 辨认模式：原形强制不显示，玩家手输原形 —— */
   function recHide(inf, tense, person, askTense){
-    DB.settings = Object.assign(defaultSettings(), {tenses:[tense], modes:['recognize'],
-        levels:['A1','A2','B1','B2'], askTense:!!askTense, inputMode:'type', hideInf:true});
+    const sameCat = ALL_TENSE_KEYS.filter(k => (T[k].cp?1:0) === (T[tense].cp?1:0));
+    DB.settings = Object.assign(defaultSettings(), {tenses: askTense ? sameCat : [tense], modes:['recognize'],
+        levels:['A1','A2','B1','B2'], inputMode:'type', hideInf:true});
     syncTenseOrder(); saveDB();
     const v = byInf[inf], f = forms(v, tense);
     const q = {inf:inf, idx:VERBS.indexOf(v), zh:v.z, g:v.g, lv:v.l, mode:'recognize',
                tense:tense, person:person, answer:f[person], userAnswer:null, correct:null,
-               pickPerson:null, pickTense:null, hits:formHits(v, f[person])};
+               pickPerson:null, pickTense:null, askTense:!!askTense, hits:formHits(v, f[person])};
     SESS = {history:[q], cur:0, right:0, done:0, recent:[]};
     show('scr-practice'); renderPractice();
     return q;
+  }
+  /* 在辨认模式里作答：手输原形 + 选人称（+ 选时态） */
+  function recAnswer(q, person, tense){
+    const infInp = document.getElementById('p-inf');
+    infInp.value = q.inf; infInp.dispatchEvent(new Event('input'));
+    document.querySelectorAll('#p-persons .opt')[person].click();
+    if(q.askTense && tense){
+      const c = [...document.querySelectorAll('#p-tenses .chip')].find(b=>b.dataset.tense===tense);
+      if(c) c.click();
+    }
+    document.getElementById('p-go').click();
+    return q.correct;
   }
   let qHd = recHide('hablar','p',0,false);
   let qbox = document.querySelector('#scr-practice .qbox');
   /* 用「有没有一个正好等于原形的节点」判断，避免动词本身是变位形式的子串时误报 */
   const showsInf = (el, inf) =>
         [...el.querySelectorAll('.verb-mid')].some(e => e.textContent.trim() === inf);
-  ck('辨认+隐藏：题干没有 verb-mid', qbox.querySelectorAll('.verb-mid').length, 0);
-  ck('辨认+隐藏：题干读不到原形', showsInf(qbox, 'hablar'), false);
-  ck('辨认+隐藏：变位形式照常显示', qbox.textContent.includes(qHd.answer), true);
-  ck('辨认+隐藏：? ? ? 占位已去掉，掩码里就一个按钮', (()=>{
-       const m = qbox.querySelector('.inf-mask');
-       return !!m && !m.querySelector('.dots')
-              && m.querySelectorAll('button').length === 1
-              && !!m.querySelector('#p-peek'); })(), true);
-  ck('辨认+隐藏：有「看原形」按钮', !!document.getElementById('p-peek'), true);
-  ck('辨认+隐藏：六个人称选项照常', document.querySelectorAll('#p-persons .opt').length, 6);
-  ck('辨认+隐藏：提示语说明隐藏了原形',
-     document.getElementById('p-tip').textContent.includes('隐藏了原形'), true);
-  document.getElementById('p-peek').click();
-  ck('点「看原形」后题干显示原形',
-     showsInf(document.querySelector('#scr-practice .qbox'), 'hablar'), true);
-  ck('看原形后按钮消失', !document.getElementById('p-peek'), true);
-  /* 看原形不影响判定 */
-  document.querySelectorAll('#p-persons .opt')[0].click();
-  document.getElementById('p-go').click();
-  ck('看原形后仍判对', qHd.correct, true);
+  ck('辨认：题干没有 verb-mid（原形不显示）', qbox.querySelectorAll('.verb-mid').length, 0);
+  ck('辨认：题干读不到原形', showsInf(qbox, 'hablar'), false);
+  ck('辨认：变位形式照常显示', qbox.textContent.includes(qHd.answer), true);
+  ck('辨认：有手输原形的输入框', !!document.getElementById('p-inf'), true);
+  ck('辨认：六个人称选项照常', document.querySelectorAll('#p-persons .opt').length, 6);
+  ck('辨认：提示语说明要手输原形',
+     document.getElementById('p-tip').textContent.includes('原形'), true);
+  /* 手输原形 + 选人称 → 判对 */
+  recAnswer(qHd, 0, null);
+  ck('手输原形后仍判对', qHd.correct, true);
 
-  /* 作答后自动揭示原形 */
-  qHd = recHide('hablar','p',0,false);
-  ck('作答前掩码还在', document.querySelectorAll('#p-mask').length, 1);
+  /* 原形写错 → 判错，并给出原形错误提示 */
+  let qW = recHide('hablar','p',0,false);
+  (()=>{ const i = document.getElementById('p-inf');
+         i.value = 'comer'; i.dispatchEvent(new Event('input')); })();
   document.querySelectorAll('#p-persons .opt')[0].click();
   document.getElementById('p-go').click();
-  ck('作答后掩码消失', document.querySelectorAll('#p-mask').length, 0);
-  ck('作答后原形自动回到题干',
-     showsInf(document.querySelector('#scr-practice .qbox'), 'hablar'), true);
+  ck('原形写错判错', qW.correct, false);
+  ck('反馈给出原形错误提示',
+     document.getElementById('p-feedback').textContent.includes('原形不对'), true);
 
   /* 隐藏原形 + 问时态：选项框照常，且同形判定不受影响 */
   let qC = recHide('comprar','pr',3,true);
@@ -656,12 +689,8 @@
   ck('辨认+隐藏+问时态：选项框存在', !!document.getElementById('p-tenses'), true);
   ck('辨认+隐藏+问时态：选项框有 chip',
      document.querySelectorAll('#p-tenses .chip').length > 0, true);
-  document.querySelectorAll('#p-persons .opt')[3].click();
-  [...document.querySelectorAll('#p-tenses .chip')].find(b=>b.dataset.tense==='p').click();
-  document.getElementById('p-go').click();
+  recAnswer(qC, 3, 'p');
   ck('隐藏原形不影响同形判定（选现在时也判对）', qC.correct, true);
-  ck('作答后原形出现在题干',
-     showsInf(document.querySelector('#scr-practice .qbox'), 'comprar'), true);
 
   /* —— 19b 复现模式：永远显示原形 —— */
   DB.settings = Object.assign(defaultSettings(), {tenses:['p'], modes:['produce'],
@@ -700,11 +729,15 @@
        document.getElementById('p-tip').textContent.includes('隐藏了原形'), true);
     ck('转换模式：练习页也没有原形快捷开关',
        document.querySelectorAll('#scr-practice #p-inf').length, 0);
-    /* 改设置走菜单：关掉后原形回到题干 */
-    DB.settings.hideInf = false; saveDB(); renderPractice();
-    ck('改设置后原形回到题干',
-       showsInf(document.querySelector('#scr-practice .qbox'), qSh.inf), true);
-    ck('改设置后掩码消失',
+    /* 改设置走菜单：关掉后**新出的题**原形回到题干 —— 本题渲染读出题时的快照，
+       全局设置只影响之后出的题（第 4 轮定下的约定） */
+    DB.settings.hideInf = false; saveDB();
+    SESS.history.push(makeQuestion()); SESS.cur = SESS.history.length - 1;
+    const qNewInf = SESS.history[SESS.cur].inf;
+    renderPractice();
+    ck('改设置后新题的原形回到题干',
+       showsInf(document.querySelector('#scr-practice .qbox'), qNewInf), true);
+    ck('改设置后新题掩码消失',
        document.querySelectorAll('#scr-practice .qbox .inf-mask').length, 0);
     const saved = JSON.parse(localStorage.getItem('es_conj_app_v1'));
     ck('隐藏开关已写入本地存储', saved.settings.hideInf, false);
@@ -757,36 +790,40 @@
     ck('点「看原形」：原形行的壳高度与掩码态一致',
        Math.abs(document.querySelector('#scr-practice .inf-line').getBoundingClientRect().height - lineH) < 1, true);
 
-    /* 输入一半再开关中文：布局不动、答案不丢、原形不被盖回 */
+    /* ★ 练习页刻意不再放「设置」入口与「中文：开 / 关」：
+       它们会改本次练习的参数，而题干与选项是按出题那一刻算好的。
+       下面验证练习页确实没有这些控件，而且已经敲进去的答案与揭开的原形不会被重绘弄丢。 */
     document.getElementById('p-input').value = 'he di';
-    document.getElementById('p-zh').click();
-    ck('开中文：按钮文案变成「中文：开」', document.getElementById('p-zh').textContent, '中文：开');
-    ck('开中文：释义行由隐形变可见',
-       document.querySelector('#scr-practice .qbox .zh').classList.contains('off'), false);
-    ck('开中文：题干高度不变', Math.abs(H() - h0) < 1, true);
-    ck('开中文：答题区不移动', Math.abs(Y() - y0) < 1, true);
-    ck('开中文：已经敲进去的答案没有丢', document.getElementById('p-input').value, 'he di');
-    ck('开中文：已揭示的原形没有被盖回 ? ? ?',
+    ck('★ 练习页没有「设置」入口', document.getElementById('m-set').closest('#scr-practice'), null);
+    ck('★ 练习页没有「中文：开 / 关」按钮', document.getElementById('p-zh'), null);
+    ck('★ 练习页只有 退出 / 上一题 / 变位查询 三个按钮',
+       [...document.querySelectorAll('#scr-practice .nav button')].map(b=>b.id),
+       ['p-exit','p-prev','p-table']);
+    ck('★ 设置入口搬到了主页「练习模式」一行（不在顶栏、不在练习页）',
+       document.querySelector('#scr-menu .modebox').contains(document.getElementById('m-set'))
+       && !document.querySelector('.topbar').contains(document.getElementById('m-set')), true);
+
+    const hKeep = H(), yKeep = Y();
+    renderPractice();                       /* 整屏重绘（换语言 / 改设置都会走到这里） */
+    ck('重绘后题干高度不变', Math.abs(H() - hKeep) < 1, true);
+    ck('重绘后答题区不移动', Math.abs(Y() - yKeep) < 1, true);
+    ck('重绘后已揭示的原形还在',
        showsInf(document.querySelector('#scr-practice .qbox'), qLy.inf), true);
-    ck('开中文：掩码没有重新出现',
+    ck('重绘后掩码没有重新出现',
        document.querySelectorAll('#scr-practice #p-mask').length, 0);
 
-    document.getElementById('p-zh').click();
-    ck('关中文：按钮文案变成「中文：关」', document.getElementById('p-zh').textContent, '中文：关');
-    ck('关中文：释义行隐形但保留高度', (()=>{
-         const z = document.querySelector('#scr-practice .qbox .zh');
-         return [z.classList.contains('off'), z.getBoundingClientRect().height > 0]; })(), [true, true]);
-    ck('关中文：题干高度仍与最初一致', Math.abs(H() - h0) < 1, true);
-    ck('关中文：已揭示的原形仍在',
-       showsInf(document.querySelector('#scr-practice .qbox'), qLy.inf), true);
-    ck('中文开关写进了本地存储',
-       JSON.parse(localStorage.getItem('es_conj_app_v1')).settings.showZh, false);
+    /* 释义行的显隐由「本题快照」决定：出题时 showZh=false（mkShiftQ 里设的），
+       出题后就算把全局开关打开，这道题仍按快照隐藏释义 */
+    DB.settings.showZh = true; renderPractice();
+    ck('★ 出题时关掉中文：之后打开全局开关，这道题仍按快照隐藏释义',
+       document.querySelector('#scr-practice .qbox .zh').classList.contains('off'), true);
+    DB.settings.showZh = false;
   }
 
   /* —— 19d 隐藏原形不影响出题与数据正确性 —— */
   DB.settings = Object.assign(defaultSettings(), {tenses:ALL_TENSE_KEYS.slice(),
       modes:['recognize','produce','shift'], levels:['A1','A2','B1','B2'],
-      askTense:true, inputMode:'type', hideInf:true});
+      inputMode:'type', hideInf:true});
   syncTenseOrder(); saveDB();
   SESS = {history:[],cur:-1,right:0,done:0,recent:[]};
   let badHide = 0, modeCnt = {};
@@ -800,8 +837,13 @@
     if(!box){ badHide++; continue; }
     const vis = showsInf(box, q.inf);
     const masked = box.querySelectorAll('.inf-mask').length === 1;
-    /* 复现模式必须显示原形；辨认 / 转换模式必须掩码且不显示原形 */
-    if(q.mode === 'produce' ? !(vis && !masked) : !(masked && !vis)) badHide++;
+    /* 复现模式必须显示原形；转换 / 平移模式必须掩码且不显示原形；
+       辨认模式原形强制不显示（无掩码），改用手输原形的输入框 */
+    const hasInfInput = !!box.querySelector('#p-inf');
+    const badMode = q.mode === 'produce' ? !(vis && !masked)
+                  : q.mode === 'recognize' ? !(!masked && !vis && hasInfInput)
+                  : !(masked && !vis);
+    if(badMode) badHide++;
   }
   ck('300 道隐藏原形题：显示规则全部正确', badHide, 0);
   ck('300 道里三种模式都覆盖', Object.keys(modeCnt).sort(), ['produce','recognize','shift']);
@@ -814,7 +856,7 @@
   }
   function mkType(mode, tenses){
     DB.settings = Object.assign(defaultSettings(), {levels:['A1','A2','B1','B2'], modes:[mode],
-        tenses: tenses || ['p'], inputMode:'type', askTense:false, hideInf:false});
+        tenses: tenses || ['p'], inputMode:'type', hideInf:false});
     syncTenseOrder(); saveDB();
     SESS = {history:[],cur:-1,right:0,done:0,recent:[]};
     let q = null;
@@ -880,7 +922,11 @@
     ck('辨认模式未选人称时确认键禁用', document.getElementById('p-go').disabled, true);
     press(document.body, String(qR2.person + 1));
     ck('数字键 1-6 选人称', qR2.pickPerson, qR2.person);
-    ck('选完人称作答键可用', document.getElementById('p-go').disabled, false);
+    /* 只选人称、还没手输原形：确认键仍然禁用 */
+    ck('没写原形时确认键仍禁用', document.getElementById('p-go').disabled, true);
+    const kInf = document.getElementById('p-inf');
+    kInf.value = qR2.inf; kInf.dispatchEvent(new Event('input'));
+    ck('选完人称、写完原形后作答键可用', document.getElementById('p-go').disabled, false);
     press(document.body, 'Enter');
     ck('辨认模式 Enter 后已提交', qR2.correct, true);
     ck('辨认模式 Enter 后不跳题', SESS.cur, 0);
@@ -912,15 +958,18 @@
   ck('每行三个人称', pRows.map(r=>r.querySelectorAll('.opt').length), [3,3]);
   ck('每行是 3 列网格',
      pRows.map(r=>getComputedStyle(r).gridTemplateColumns.split(/\s+/).length), [3,3]);
-  ck('第一行 = 单数 yo / tú / él',
+  ck('第一行 = 单数 yo / tú / él·ella·usted',
      [...pRows[0].querySelectorAll('.opt .pol .w')].map(e=>e.textContent),
      ['yo','tú','él / ella / usted']);
   ck('第二行 = 复数 nosotros / vosotros / ellos',
      [...pRows[1].querySelectorAll('.opt .pol .w')].map(e=>e.textContent),
      ['nosotros / nosotras','vosotros / vosotras','ellos / ellas / ustedes']);
-  ck('窄屏短标签也备好了（默认隐藏）',
-     [...document.querySelectorAll('#p-persons .opt .pol .s')].map(e=>e.textContent),
-     ['yo','tú','él / ella','nosotros','vosotros','ellos / ellas']);
+  ck('人称选项一律是西语代词（不含中英人称词）',
+     pOpts.map(b=>b.querySelector('.pol').textContent).join(' ').match(/[a-záéíóúüñ\/ ]+/i) !== null, true);
+  ck('选项上不再有「中文 / 英文」人称标签',
+     [...document.querySelectorAll('#p-persons .opt .pol .s')].length, 0);
+  ck('母语只作为下方小字释义保留',
+     pOpts.every(b => b.querySelector('small').textContent.trim().length > 0), true);
   ck('DOM 顺序仍是 0–5（键盘/索引不受影响）', pOpts.map(b=>b.dataset.pick), ['0','1','2','3','4','5']);
   ck('第一行在第二行上方',
      pRows[0].getBoundingClientRect().bottom <= pRows[1].getBoundingClientRect().top + 1, true);
@@ -972,19 +1021,22 @@
      [...pgi.querySelectorAll('.prow')[1].querySelectorAll('.pl')].map(e=>e.textContent),
      ['vosotros','ustedes']);
 
-  /* 命令式辨认选项：与其他时态完全一致 —— 6 个人称、通用标签（yo 保留：
-     hable 这类同形形式也可能是虚拟式的 yo，删了就没法答这种读法） */
+  /* 命令式辨认选项：与其他时态一样 6 个人称（yo 保留：hable 这类同形形式
+     也可能是虚拟式的 yo），标签用代词整组——命令式里第二/五格直接标 usted/ustedes，
+     不出现 él/ella；yo 键回退显示 yo（命令式没有这一格，但不能留白） */
   const qPiO = mkRec('hablar','ia',2,false);   // usted 形式
   const piRows = [...document.querySelectorAll('#p-persons .orow')];
   const piOpts = [...document.querySelectorAll('#p-persons .opt')];
   ck('命令式辨认：选项与其他时态一致（6 个，含 yo）', piOpts.length, 6);
   ck('命令式辨认：data-pick 是 0–5', piOpts.map(b=>b.dataset.pick), ['0','1','2','3','4','5']);
-  ck('命令式辨认：第一行 yo/tú/él, ella, usted',
+  ck('命令式辨认：第一行 yo/tú/usted',
      [...piRows[0].querySelectorAll('.opt .pol .w')].map(e=>e.textContent),
-     ['yo','tú','él / ella / usted']);
-  ck('命令式辨认：第二行 nosotros/vosotros/ellos, ellas, ustedes',
+     ['yo','tú','usted']);
+  ck('命令式辨认：第二行 nosotros/vosotros/ustedes',
      [...piRows[1].querySelectorAll('.opt .pol .w')].map(e=>e.textContent),
-     ['nosotros / nosotras','vosotros / vosotras','ellos / ellas / ustedes']);
+     ['nosotros','vosotros','ustedes']);
+  ck('命令式辨认：不出现 él / ella / ellos / ellas',
+     piOpts.every(b=>!/él|ella/.test(b.textContent)), true);
   /* 点击哪个键就点亮哪个键（sel 落在被点选项的 data-pick 上，不得错位） */
   piOpts[2].click();
   ck('命令式辨认：点亮的就是点击的那个键',
@@ -1000,7 +1052,7 @@
   /* 命令式三个练习模式：输入框左侧主语提示只给 usted / ustedes，不再给 él/ella/ellos */
   function subjOfPractice(mode, tense, person){
     DB.settings = Object.assign(defaultSettings(), {modes:[mode], tenses:[tense],
-        levels:['A1','A2','B1','B2'], inputMode:'type', askTense:false, hideInf:false});
+        levels:['A1','A2','B1','B2'], inputMode:'type', hideInf:false});
     syncTenseOrder(); saveDB();
     SESS = {history:[],cur:-1,right:0,done:0,recent:[]};
     for(let i=0;i<400;i++){ const x = makeQuestion(); if(x && x.mode===mode && x.tense===tense && x.person===person) return x; }
@@ -1036,7 +1088,7 @@
      22. 平移模式（换动词）：人称、时态不变，A 动词 → B 动词
      ============================================================ */
   localStorage.removeItem('es_conj_app_v1');
-  DB.settings = defaultSettings(); renderMenu();
+  DB.settings = defaultSettings(); openPick();
   ck('菜单出现四个模式按钮',
      [...document.querySelectorAll('#m-modes .chip')].map(b=>b.textContent.trim()),
      ['辨认模式','复现模式','转换模式','平移模式']);
@@ -1047,7 +1099,7 @@
   function mkTransfer(tenses, inputMode){
     DB.settings = Object.assign(defaultSettings(), {levels:['A1','A2','B1','B2'],
         modes:['transfer'], tenses: tenses || ['p'], inputMode: inputMode || 'type',
-        askTense:false, hideInf:false});
+        hideInf:false});
     syncTenseOrder(); saveDB();
     SESS = {history:[],cur:-1,right:0,done:0,recent:[]};
     for(let i=0;i<300;i++){
@@ -1158,7 +1210,7 @@
   /* 四种模式混用都能出题 */
   DB.settings = Object.assign(defaultSettings(), {levels:['A1','A2','B1','B2'],
       modes:['recognize','produce','shift','transfer'], tenses: ALL_TENSE_KEYS.slice(),
-      inputMode:'type', askTense:true, hideInf:false});
+      inputMode:'type', hideInf:false});
   syncTenseOrder(); saveDB();
   SESS = {history:[],cur:-1,right:0,done:0,recent:[]};
   const seenM = {};
@@ -1210,9 +1262,9 @@
   DB.settings.lang = 'zh'; saveDB(); renderMenu(); show('scr-menu');
 
   /* ============================================================
-     24. 主语提示：放在输入框左侧；多主语的人称随机只显示一个
+     24. 主语提示：放在输入框左侧；多主语的人称整组列出（西语代词）
      ============================================================ */
-  DB.settings = defaultSettings(); renderMenu();
+  DB.settings = defaultSettings(); openPick();
   const qS3 = mkType('produce', ['p','pp']);
   ck('复现模式能出题（主语提示）', !!qS3, true);
   if(qS3){
@@ -1221,10 +1273,11 @@
     const cue = row.querySelector('.subj'), inp = row.querySelector('input#p-input');
     ck('主语提示在输入框左边',
        cue.getBoundingClientRect().right <= inp.getBoundingClientRect().left + 1, true);
-    ck('主语提示只给一个代词（不写「/」）',
-       cue.querySelector('.sp').textContent.indexOf('/') < 0, true);
-    ck('主语提示是该人称的合法主语之一',
-       PERSONS[qS3.person].pro.indexOf(cue.querySelector('.sp').textContent) >= 0, true);
+    ck('主语提示只给西语代词',
+       /^[a-záéíóúüñ\/ ]+$/i.test(cue.querySelector('.sp').textContent), true);
+    ck('主语提示是该人称候选集的完整拼接（「/」分隔）',
+       cue.querySelector('.sp').textContent,
+       PERSONS[qS3.person].pro.join(' / '));
     ck('题干框里不再重复人称',
        document.querySelectorAll('#scr-practice .qbox .pill.dark').length, 0);
     ck('主语提示只保留西语（不再有中/英释义小字）', !!cue.querySelector('.zk'), false);
@@ -1247,84 +1300,127 @@
     ck('转换模式：题干框里没有人称 pill',
        document.querySelectorAll('#scr-practice .qbox .pill.dark').length, 0);
   }
-  /* 随机性：第三人称单数应当出现多种单一主语（él / ella / usted） */
+  /* 第三人称单数 / 复数一律把整组主语列出来（不再随机单选一种） */
   DB.settings = Object.assign(defaultSettings(), {levels:['A1','A2','B1','B2'],
       modes:['produce'], tenses:['p'], inputMode:'type'});
   syncTenseOrder(); saveDB();
-  let subjBad = 0, subjUnstable = 0;
-  const subjSeen = {};
+  let subjBad = 0, subjUnstable = 0, subjSet = 0;
   for(let i=0;i<300;i++){
     const q = makeQuestion();
     if(!q) continue;
     const sp = subjectOf(q);
-    if(PERSONS[q.person].pro.indexOf(sp) < 0) subjBad++;
+    if(sp !== PERSONS[q.person].pro.join(' / ')) subjBad++;
     if(subjectOf(q) !== sp) subjUnstable++;
-    if(q.person === 2) subjSeen[sp] = (subjSeen[sp]||0)+1;
+    if(q.person === 2 && sp === 'él / ella / usted') subjSet++;
+    else if(q.person === 5 && sp === 'ellos / ellas / ustedes') subjSet++;
   }
-  ck('主语提示永远落在该人称的候选里', subjBad, 0);
+  ck('主语提示 = 该人称的完整代词组', subjBad, 0);
   ck('主语提示在同一题内稳定', subjUnstable, 0);
-  ck('él / ella / usted 会随机单选其中一种', Object.keys(subjSeen).length >= 2, true);
-  ck('单选主语只会是 él / ella / usted',
-     Object.keys(subjSeen).every(x=>['él','ella','usted'].indexOf(x)>=0), true);
+  ck('第三人称把 él/ella/usted 与 ellos/ellas/ustedes 整组列出', subjSet > 0, true);
 
   /* ============================================================
-     25. 设置抽屉（单选模式）：用不上的项置灰保留，不再消失
+     25. 右侧设置栏：标签 + 拨动开关，选项一律可用（不随模式置灰）
      ============================================================ */
   localStorage.removeItem('es_conj_app_v1');
-  DB.settings = defaultSettings(); SET_OPEN = false; renderMenu();
-  ck('设置面板默认收起', document.getElementById('m-opt-panel').classList.contains('hidden'), true);
-  ck('设置按钮默认文案', document.getElementById('m-set').textContent, '⚙ 设置');
-  ck('设置按钮在练习模式标题行里',
-     document.getElementById('h-mode').parentElement.contains(document.getElementById('m-set')), true);
-  ck('主页不再有独立的「选项」小节',
-     [...document.querySelectorAll('#scr-menu .card > h2')]
+  DB.settings = defaultSettings(); renderMenu();
+  ck('设置栏默认收起', document.getElementById('st').classList.contains('on'), false);
+  ck('设置按钮在主页「练习模式」一行右侧（不在顶栏）',
+     document.querySelector('.modebox').contains(document.getElementById('m-set'))
+       && !document.querySelector('.topbar').contains(document.getElementById('m-set')), true);
+  ck('设置按钮文案', document.getElementById('m-set').textContent, '设置');
+  ck('设置按钮带齿轮标志（::before 内容）',
+     (()=>{ const c = getComputedStyle(document.getElementById('m-set'), '::before');
+            return c.content && c.content.indexOf('⚙') >= 0; })(), true);
+  ck('主页不再有「选项」小节',
+     [...document.querySelectorAll('#scr-menu h2')]
        .filter(h=>h.textContent.indexOf('选项')>=0).length, 0);
   document.getElementById('m-set').click();
-  ck('点开后设置面板出现', document.getElementById('m-opt-panel').classList.contains('hidden'), false);
-  ck('点开后按钮变「收起」', document.getElementById('m-set').textContent, '⚙ 收起设置');
-  const opChips = () => [...document.querySelectorAll('#m-opts .chip')];
-  const opKeys  = () => opChips().map(b=>b.dataset.opt);
+  ck('点设置后右栏滑出', document.getElementById('st').classList.contains('on'), true);
+  ck('设置按钮标记为展开', document.getElementById('m-set').getAttribute('aria-expanded'), 'true');
+  ck('正文没有被推动（右栏是浮层）',
+     getComputedStyle(document.getElementById('st')).position, 'fixed');
+  const opChips = () => [...document.querySelectorAll('#st-body .sw')];
+  const opKeys  = () => opChips().map(b=>b.dataset.opt).sort();
   const opOf    = k => opChips().filter(b=>b.dataset.opt===k)[0];
-  const ALL_OPTS = ['showZh','hideInf','strictAccent','askTense','type','vosotros','onlyWrong'];
-  ck('设置项固定 7 项，任何模式都不隐藏', opKeys(), ALL_OPTS);
+  const ALL_OPTS = ['hideInf','showZh','strictAccent','vosotros'];
+  ck('设置栏只放四个全局项', opKeys(), ALL_OPTS);
   ck('「vosotros」设置项存在', !!opOf('vosotros'), true);
-  ck('面板说明点名当前模式',
-     document.getElementById('m-opt-sh').textContent.indexOf(MODE_ZH['produce']) >= 0, true);
+  ck('每项都有文字标签', opChips().every(b=>{
+       const r = b.closest('.setrow');
+       return r && r.querySelector('.st b').textContent.trim().length > 0; }), true);
+  ck('每项都有说明小字', opChips().every(b=>{
+       const r = b.closest('.setrow');
+       return r && r.querySelector('.st small').textContent.trim().length > 4; }), true);
+  ck('开关是按钮 + 圆形滑块（不再靠点了变色）',
+     (()=>{ const b = opOf('hideInf');
+            const knob = getComputedStyle(b, '::after');
+            return b.tagName === 'BUTTON' && knob.width !== 'auto' && knob.borderRadius === '50%'; })(), true);
 
   const modeChip = k => [...document.querySelectorAll('#m-modes .chip')]
                           .filter(b=>b.textContent.trim() === MODE_ZH[k])[0];
-  /* 复现模式 */
-  ck('复现：用不上的项置灰',
-     ['hideInf','askTense'].map(k=>opOf(k).disabled), [true,true]);
-  ck('复现：用得上项可点',
-     ['showZh','strictAccent','type','vosotros','onlyWrong'].map(k=>opOf(k).disabled),
-     [false,false,false,false,false]);
-  ck('复现：置灰项仍带 label（没有消失）', opOf('hideInf').textContent, '隐藏动词原形');
-  ck('复现：置灰项不能按下', opOf('hideInf').getAttribute('aria-pressed'), 'false');
-  ck('复现：置灰项 title 说明原因',
-     opOf('hideInf').title.indexOf('用不上') >= 0, true);
-  ck('复现：隐藏原形说明提示不起作用',
-     document.getElementById('m-opt-hint').textContent.length > 0, true);
+  /* 逐个模式切过去：设置项一个都不该置灰 */
+  ['recognize','shift','transfer','produce'].forEach(k=>{
+    modeChip(k).click();
+    ck('切到「'+MODE_ZH[k]+'」后设置项全都可用',
+       opChips().every(b=>!b.disabled), true);
+  });
+  ck('切模式后设置栏仍开着', document.getElementById('st').classList.contains('on'), true);
+  ck('切模式不会把开关重置', opKeys(), ALL_OPTS);
 
-  /* 辨认模式 */
-  modeChip('recognize').click();
-  ck('辨认：答题方式 + 重音设置置灰',
-     opKeys().filter(k=>opOf(k).disabled), ['strictAccent','type']);
-  ck('辨认：隐藏原形可用（该模式生效）', opOf('hideInf').disabled, false);
-  ck('辨认：问时态可用', opOf('askTense').disabled, false);
-  ck('辨认：vosotros 开关可用', opOf('vosotros').disabled, false);
+  /* 开关点一下就切换，并且立刻落到 DB.settings */
+  const zhBefore = DB.settings.vosotros;
+  opOf('vosotros').click();
+  ck('点开关即切换设置', DB.settings.vosotros, !zhBefore);
+  ck('开关状态反映在 aria-pressed 上', opOf('vosotros').getAttribute('aria-pressed'),
+     String(!zhBefore));
+  opOf('vosotros').click();
+  ck('再点一下切回来', DB.settings.vosotros, zhBefore);
 
-  /* 转换模式 */
-  modeChip('shift').click();
-  ck('转换：问时态置灰', opOf('askTense').disabled, true);
-  ck('转换：答题方式可用', opOf('type').disabled, false);
-  ck('转换：隐藏原形可用', opOf('hideInf').disabled, false);
-
-  /* 平移模式 */
-  modeChip('transfer').click();
-  ck('平移：答题方式可用', opOf('type').disabled, false);
-  ck('平移：隐藏原形可用', opOf('hideInf').disabled, false);
-  ck('切模式后设置面板仍展开', document.getElementById('m-opt-panel').classList.contains('hidden'), false);
+  /* 答题方式 / 严格重音 / 同时问时态：住在自定义槽的「编辑」模态里，实时存进槽 */
+  const customKey = k => [...document.querySelectorAll('#m-presets .key[data-custom]')]
+                            .filter(b=>b.dataset.custom === k)[0];
+  const editBtn = k => customKey(k).querySelector('.key-edit');
+  ck('选项键里有 2 个自定义槽',
+     document.querySelectorAll('#m-presets .key[data-custom]').length, 2);
+  ck('每个自定义槽键的右侧有带铅笔标志的「编辑」按钮',
+     editBtn('custom1') && editBtn('custom2')
+     && editBtn('custom1').textContent.indexOf('✏️') >= 0
+     && editBtn('custom1').textContent.indexOf('编辑') >= 0, true);
+  ck('自定义槽预填充了 A2（避免没配置就开始练）',
+     DB.custom.custom2.levels, ['A2']);
+  customKey('custom1').click();
+  ck('★ 点自定义键只选中，不展开内联面板', document.getElementById('m-custom').classList.contains('on'), false);
+  editBtn('custom1').click();
+  ck('★ 点「编辑」弹出模态', document.getElementById('cmodal').classList.contains('on'), true);
+  ck('★ 模态里有三个小节标题',
+     [...document.querySelectorAll('#cm-body .sec')].map(e=>e.textContent.trim()),
+     ['1 · 词库','2 · 时态','3 · 其它']);
+  const seg = m => [...document.querySelectorAll('#m-seg button')]
+                       .filter(b=>b.dataset.mode===m)[0];
+  seg('choice').click();
+  ck('分段控件切到「选择」', DB.settings.inputMode, 'choice');
+  ck('分段控件高亮跟着走', seg('choice').getAttribute('aria-pressed'), 'true');
+  ck('改动实时存进了自定义槽', DB.custom.custom1.inputMode, 'choice');
+  ck('★ 「严格要求重音」不在编辑模态里（已移到齿轮设置栏）',
+     document.querySelector('#cm-body [data-opt="strictAccent"]'), null);
+  ck('★ 自定义槽不再保存齿轮设置项（strictAccent / showZh / askTense）',
+     ['strictAccent','showZh','askTense'].every(k => !(k in DB.custom.custom1)), true);
+  seg('type').click();
+  ck('分段控件切回「手写」', DB.settings.inputMode, 'type');
+  ck('自定义槽跟着回写', DB.custom.custom1.inputMode, 'type');
+  ck('★ 点「应用这套设置」关闭模态', (()=>{
+       document.getElementById('cm-apply').click();
+       return !document.getElementById('cmodal').classList.contains('on');
+     })(), true);
+  ck('★ 应用后弹出「✅ 修改成功」toast',
+     document.getElementById('toast').classList.contains('on')
+     && document.getElementById('toast').textContent.indexOf('✅') >= 0
+     && document.getElementById('toast').textContent.indexOf('修改成功') >= 0, true);
+  editBtn('custom1').click();
+  ck('★ Esc 也能关掉模态', (()=>{
+       document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape'}));
+       return !document.getElementById('cmodal').classList.contains('on');
+     })(), true);
 
   /* 模式单选：点另一个模式只保留一个 */
   modeChip('produce').click();
@@ -1334,8 +1430,11 @@
      [...document.querySelectorAll('#m-modes .chip[aria-pressed="true"]')].length, 1);
   ck('再点同一个模式不会取消', (()=>{ modeChip('produce').click(); return DB.settings.modes[0]; })(), 'produce');
 
+  /* 关掉设置栏 */
+  document.getElementById('st-close').click();
+  ck('点 ✕ 收起设置栏', document.getElementById('st').classList.contains('on'), false);
+
   /* vosotros 开关 */
-  document.getElementById('m-set').click();      // 收起
   localStorage.removeItem('es_conj_app_v1');
   DB.settings = defaultSettings(); DB.settings.modes = ['produce'];
   DB.settings.tenses = ['p']; DB.settings.levels = ['A1','A2','B1','B2'];
@@ -1363,10 +1462,10 @@
   DB.settings = defaultSettings(); renderMenu();
 
   /* ============================================================
-     28. 置灰只作用于设置项：难度 / 时态在任何模式下都全可选
+     28. 难度 / 时态在任何模式下都全可选；两者都收在「自定义」里
      ============================================================ */
   localStorage.removeItem('es_conj_app_v1');
-  DB.settings = defaultSettings(); SET_OPEN = true; renderMenu();
+  DB.settings = defaultSettings(); openPick();
   const lvChips  = () => [...document.querySelectorAll('#m-levels .chip')];
   const tnChips  = () => [...document.querySelectorAll('#m-tenses .chip[data-tense]')];
   const modeBtn  = k => [...document.querySelectorAll('#m-modes .chip')]
@@ -1392,7 +1491,7 @@
   /* 平移模式：所有时态都能点选，且开始时态区不因为模式被清空 */
   localStorage.removeItem('es_conj_app_v1');
   DB.settings = defaultSettings(); DB.settings.modes = ['transfer'];
-  DB.settings.tenses = ALL_TENSE_KEYS.slice(); SET_OPEN = true; renderMenu();
+  DB.settings.tenses = ALL_TENSE_KEYS.slice(); openPick();
   ck('平移模式时态数为 15', tnChips().length, 15);
   ck('平移模式全选按钮可用', document.getElementById('m-t-all').disabled, false);
   const comChip = tnChips().filter(b=>b.dataset.tense === 'pp')[0];   // 复合时态
@@ -1424,12 +1523,10 @@
      ============================================================ */
   localStorage.removeItem('es_conj_app_v1');
   DB.settings = defaultSettings(); DB.settings.levels = ['A1'];
-  DB.settings.tenses = ALL_TENSE_KEYS.slice(); SET_OPEN = true; renderMenu();
+  DB.settings.tenses = ALL_TENSE_KEYS.slice(); openPick();
   const recKeys = () => [...document.querySelectorAll('#m-t-recs .chip')];
   const recKey = lv => recKeys().filter(b=>b.dataset.rec === lv)[0];
   ck('推荐区有 A1/A2/B1/B2 四个键', recKeys().map(b=>b.dataset.rec), ['A1','A2','B1','B2']);
-  ck('推荐区有「推荐时态组：」标签',
-     document.getElementById('m-t-recs').textContent.indexOf('推荐时态组') >= 0, true);
   ck('四个键在任何难度下都全可用', recKeys().filter(b=>b.disabled).length, 0);
 
   /* 核心：键固定，与上方难度选择完全无关 —— 难度设成 B2，点 A1 仍套 A1 */
@@ -1463,10 +1560,13 @@
   ck('B2 键 title 含 15', recKey('B2').title.indexOf('15') >= 0, true);
 
   /* 难度区新增「各级对应时态」说明 */
-  ck('难度区有等级↔时态说明', 
-     document.getElementById('m-lv-tense-hint').textContent.indexOf('A1') >= 0, true);
-  ck('难度说明不再提「灰色级别」',
-     document.getElementById('m-level-hint').textContent.indexOf('灰色') < 0, true);
+  ck('主页不再有等级↔时态的长说明',
+     document.getElementById('m-lv-tense-hint'), null);
+  ck('主页不再有「自定义」以外的等级说明段',
+     document.getElementById('m-level-hint').textContent.length < 24, true);
+  /* 难度区不再有整段说明句，只留一行「能出多少题」 */
+  ck('自定义里只留一行题库计数',
+     /^\d+ 个动词$/.test(document.getElementById('m-level-hint').textContent.trim()), true);
 
   /* ============================================================
      30. 练习模式：按钮下方单独一行显示当前模式的玩法
@@ -1505,42 +1605,44 @@
   syncTenseOrder(); saveDB(); show('scr-menu'); renderMenu();
 
 
-  /* 合并后只有三个小节：1 词库范围（等级 + 标签） / 2 练习模式 / 3 时态 */
-  ck('等级与标签同属「词库范围」小节',
-     document.getElementById('h-scope').parentElement
-       .contains(document.getElementById('m-levels')) &&
-     document.getElementById('h-scope').parentElement
-       .contains(document.getElementById('m-tags')), true);
+  /* 结构：一张卡 = 练习模式（上）+ 6 个选项键（中）+ 自定义编辑面板（模态里） */
+  DB.activeKey = 'custom1'; renderMenu();
+  /* 编辑控件住在「自定义」编辑模态（#cm-body）；兼容未来的容器变化，两处都认 */
+  const pkHost = () =>
+    (document.getElementById('cm-body').contains(document.getElementById('m-levels'))
+       ? document.getElementById('cm-body') : document.getElementById('m-pick-body'));
+  ck('等级与标签都在自定义编辑面板里',
+     (()=>{ const h = pkHost();
+            return h.contains(document.getElementById('m-levels'))
+                && h.contains(document.getElementById('m-tags')); })(), true);
+  ck('时态区也在面板里',
+     pkHost().contains(document.getElementById('m-tenses')), true);
   ck('等级排在标签之前',
      before(document.getElementById('m-levels'), document.getElementById('m-tags')), true);
-  ck('词库范围排在练习模式之前',
-     before(document.getElementById('m-tags'), document.getElementById('m-modes')), true);
-  ck('练习模式排在时态之前',
-     before(document.getElementById('m-modes'), document.getElementById('m-tenses')), true);
-  ck('不再有独立的「难度」小节',
-     document.getElementById('h-level'), null);
-  ck('小节编号依次为 1/2/3 = 词库范围/练习模式/时态',
-     ['h-scope','h-mode','h-tense']
-       .map(i=>document.getElementById(i).textContent.trim().slice(0,1)), ['1','2','3']);
-  ck('小节 1 是词库范围', document.getElementById('h-scope').textContent.includes('词库范围'), true);
-  ck('词库范围标题提示取交集',
-     document.getElementById('h-scope').textContent.includes('交集'), true);
-  ck('等级行有「按等级：」标签',
-     document.getElementById('m-levels').textContent.indexOf('按等级') >= 0, true);
-  ck('标签行有「按标签：」标签',
-     document.getElementById('m-tags').textContent.indexOf('按标签') >= 0, true);
+  ck('练习模式排在 6 个键之前',
+     before(document.getElementById('m-modes'), document.getElementById('m-presets')), true);
+  ck('键排在面板之前',
+     before(document.getElementById('m-presets'), document.getElementById('m-custom')), true);
+  ck('不再有独立的「词库/时态」小节标题',
+     !document.getElementById('h-scope') && !document.getElementById('h-tense'), true);
+  ck('主页的模式区标题还在（h-mode 已从 h2 降为小节标题）',
+     !!document.getElementById('h-mode') && !!document.getElementById('h-guide'), true);
+  ck('等级行不再有「按等级：」前缀',
+     document.getElementById('m-levels').textContent.indexOf('按等级') < 0, true);
+  ck('标签行不再有「按标签：」前缀',
+     document.getElementById('m-tags').textContent.indexOf('按标签') < 0, true);
   /* 难度与标签的取交集：等级 ∩ 标签 ∩ 时态 才是真正的题库 */
   (()=>{
     DB.settings = defaultSettings();
     DB.settings.levels = ['B2']; DB.settings.tenses = ALL_TENSE_KEYS.slice();
     DB.settings.tagFilter = ''; renderMenu();
     const all = buildPool().length;
-    DB.settings.tagFilter = '不规则'; renderMenu();
+    DB.settings.tagFilter = '不规则'; repaintPick();
     const irr = buildPool().length;
     ck('加标签后题库变窄（交集生效）', irr < all && irr > 0, true);
     ck('交集结果 = 既是 B2 又是不规则',
        buildPool().every(v => v.l === 'B2' && tagMatch(v, '不规则')), true);
-    ck('提示行显示交集后的动词数',
+    ck('面板里显示交集后的动词数',
        document.getElementById('m-level-hint').textContent.indexOf(String(irr)) >= 0, true);
   })();
 
@@ -1562,9 +1664,6 @@
   ck('英语标题', document.getElementById('g-title').textContent, 'Spanish Verb Conjugation Trainer');
   ck('英语副标题带动词数',
      document.getElementById('g-sub').textContent.indexOf(String(VERBS.length)) >= 0, true);
-  ck('英语小节编号', ['h-scope','h-mode','h-tense']
-       .map(i=>document.getElementById(i).textContent.trim().slice(0,1)), ['1','2','3']);
-  ck('英语小节名', document.getElementById('h-scope').textContent.trim().slice(0,9), '1 · Verb ');
   ck('英语模式规则行', 
      document.getElementById('m-mode-rule').textContent.indexOf('Production') >= 0, true);
   ck('英语模式按钮',
@@ -1577,13 +1676,14 @@
   ck('英语词库范围按钮',
      [...document.querySelectorAll('#m-tags .chip')].map(b=>b.textContent.trim().split(' ')[0]),
      ['All','Irregular','Regular','High-frequency','Spelling','Stem']);
-  ck('英语设置按钮', document.getElementById('m-set').textContent,
-     SET_OPEN ? '⚙ Hide settings' : '⚙ Settings');
+  ck('英语设置按钮', document.getElementById('m-set').textContent, 'Settings');
   document.getElementById('m-set').click();
-  ck('英语设置项',
-     [...document.querySelectorAll('#m-opts .chip')].map(b=>b.textContent.trim()).slice(0,3),
-     ['Show meaning','Hide the infinitive','Require exact accents']);
-  document.getElementById('m-set').click();
+  ck('英语设置项（设置栏四个全局项：隐藏原形 / 含 vosotros / 显示中文释义 / 严格重音）',
+     [...document.querySelectorAll('#st-body .setrow .st b')].map(b=>b.textContent.trim()),
+     ['Hide the infinitive','Include vosotros','Show meaning','Require exact accents']);
+  ck('英语界面下没有答题方式滑块（已搬到自定义面板）',
+     document.querySelectorAll('#st-seg button').length, 0);
+  document.getElementById('st-close').click();
   /* 变位表：英文释义 + 英文时态名 + 英文标签 */
   openTable('comprar');
   ck('英语变位表显示英文释义',
@@ -1607,7 +1707,8 @@
     ck('英语模式下主语提示同样只给西语代词',
        (()=>{ const c = document.querySelector('#scr-practice .ansrow .subj');
               return !!c && !c.querySelector('.zk')
-                     && PERSONS[qEn.person].pro.indexOf(c.querySelector('.sp').textContent) >= 0; })(),
+                     && c.querySelector('.sp').textContent
+                        === PERSONS[qEn.person].pro.join(' / '); })(),
        true);
     ck('英语占位符', document.getElementById('p-input').getAttribute('placeholder'),
        'Type the conjugated form…');
@@ -1644,6 +1745,17 @@
      '⑦ 词根变化不规则整理');
   ck('主页第 8 个入口是重音页', document.querySelectorAll('#m-guide [data-gi]')[7].textContent,
      '⑧ 重音与重音符');
+  /* 这一张卡只剩标题 + 两个按钮 + 8 个入口，不再有描述文字 */
+  ck('讲解卡里没有多余的描述文字',
+     document.getElementById('m-guide-hint'), null);
+  ck('讲解卡里没有「查看 →」按钮',
+     document.getElementById('m-guide-open'), null);
+  ck('讲解卡里的按钮只有变位查询 + 8 个入口',
+     document.querySelectorAll('.gcard button').length, 9);
+  ck('8 页入口是两列网格（排版整齐）',
+     getComputedStyle(document.getElementById('m-guide')).display, 'grid');
+  ck('讲解卡下方没有描述性段落',
+     [...document.querySelectorAll('.gcard > p')].length, 0);
 
   const cellsOf = blk => [...blk.querySelectorAll('.pcell')].map(c => ({
       pl: c.querySelector('.pl').textContent,
@@ -1952,13 +2064,17 @@
      judge('temiamos', ['tememos','temimos'], true, 'pr').ok, false);
   ck('judge 仍支持单个答案', judge('tememos', 'tememos', true, 'p').ok, true);
 
-  /* 用「只练错题」把题库锁到 dormir + temer：dormimos 同时是现在时和简单过去时 */
+  /* 「只练错题」已下线（改成按错误率动态出题，以后再做）：
+     设置里误留 onlyWrong 也不该影响题库 —— buildPool 只看等级 ∩ 标签 ∩ 时态 */
   localStorage.removeItem('es_conj_app_v1');
   DB.settings = Object.assign(defaultSettings(), {levels:['A1','A2','B1','B2'],
       modes:['transfer'], tenses:['p','pr'], inputMode:'type', onlyWrong:true});
   DB.stats.verbs = {dormir:{att:9,err:9,byT:{},last:0}, temer:{att:9,err:9,byT:{},last:0}};
-  syncTenseOrder(); saveDB();
-  ck('错题过滤把题库锁到 2 个动词', buildPool().map(v=>v.i).sort(), ['dormir','temer']);
+  sanitizeSettings(); syncTenseOrder(); saveDB();
+  ck('onlyWrong 已下线：题库不被它过滤（= A1–B2 全量，不是只剩错题的 2 个动词）',
+     buildPool().length === VERBS.filter(v => ['A1','A2','B1','B2'].includes(v.l)).length,
+     true);
+  ck('onlyWrong 键被 sanitize 清掉', DB.settings.onlyWrong, undefined);
 
   let amb = 0, ambBad = 0, ambSample = null;
   for(let i=0;i<1500;i++){
@@ -2081,14 +2197,17 @@
   DB.settings = defaultSettings(); syncTenseOrder(); saveDB(); renderMenu();
   closeDrawer();
   ck('右栏默认是收起的', document.body.classList.contains('dw-open'), false);
-  ck('收起时右边缘挂着拉手', document.querySelector('#dw-tab .lb').textContent, '变位表');
-  ck('拉手带图标，比一个白条显眼', !!document.querySelector('#dw-tab .ico'), true);
-  const tabBg = getComputedStyle(document.getElementById('dw-tab')).backgroundImage;
-  ck('拉手用醒目的实色底（不是白底细边框）', /gradient/.test(tabBg), true);
+  ck('收起时没有贴右缘的常驻拉手（太辣眼睛，已移除）',
+     !!document.querySelector('.dwtab'), false);
+  ck('变位表入口搬进开始菜单，和「变位规则速览」同一张卡片',
+     !!document.querySelector('#scr-menu .gcard #dw-tab'), true);
+  ck('变位查询入口文案', document.querySelector('#dw-tab span').textContent, '变位查询');
+  ck('练习页顶部仍有变位表按钮（做题途中可随手查）',
+     !!document.getElementById('p-table'), true);
   const vw = () => document.documentElement.clientWidth;
-  ck('拉手贴在右边缘', (()=>{
+  ck('变位表入口是个普通按钮，不再压在正文上', (()=>{
        const r = document.getElementById('dw-tab').getBoundingClientRect();
-       return r.width > 0 && Math.round(r.right) >= vw() - 1; })(), true);
+       return r.width > 0 && Math.round(r.right) < vw(); })(), true);
 
   /* 开合抽屉不能动正文：宽度/位置/滚动条一律不变 */
   const wrapRect = () => {
@@ -2127,8 +2246,9 @@
   document.getElementById('dw-tab').click();
   document.getElementById('dw-scrim').click();
   ck('点遮罩也能收回右栏', document.body.classList.contains('dw-open'), false);
-  ck('主页已经没有「变位表查询」卡片（右栏拉手就够了）',
-     !document.getElementById('m-table-btn') && !document.getElementById('h-table'), true);
+  ck('主页没有「变位表查询」独立卡片，但开始菜单里有一个入口按钮',
+     !document.getElementById('m-table-btn') && !document.getElementById('h-table')
+     && !!document.getElementById('dw-tab'), true);
   document.getElementById('dw-tab').click();
   ck('拉手本身就能拉开右栏', document.body.classList.contains('dw-open'), true);
 
@@ -2238,22 +2358,434 @@
   ck('英语界面下右栏标题与查询框占位符',
      [document.getElementById('dw-ttl').textContent,
       document.getElementById('dw-q').getAttribute('placeholder')],
-     ['Conjugation table','Infinitive, conjugated form or meaning…']);
+     ['Conjugation lookup','Infinitive, conjugated form or meaning…']);
   ck('英语界面下两栏标题',
      [...document.querySelectorAll('#t-body .dwg-cap span')].slice(0,2).map(s=>s.textContent),
      ['Simple','Compound']);
-  ck('英语界面下拉手文案', document.querySelector('#dw-tab .lb').textContent, 'Table');
+  ck('英语界面下变位查询入口文案', document.querySelector('#dw-tab span').textContent, 'Lookup');
   DB.settings.lang = 'zh'; applyStatic(); closeDrawer();
 
   /* ============================================================
-     33. 等级表（含 C1/C2）与自复动词支持
+     34. 选项键：4 个固定预设 + 2 个自定义槽
+         预设只读、点「应用这套设置」才生效；自定义槽可改并实时保存；
+         点键**都不开始答题**，也**不动设置栏里的全局项**。
+     ============================================================ */
+  const pBtn = k => document.querySelector('#m-presets [data-preset="'+k+'"]');
+  const cBtn = k => document.querySelector('#m-presets [data-custom="'+k+'"]');
+  const pressed = k => pBtn(k).getAttribute('aria-pressed');
+  DB.settings = Object.assign(defaultSettings(), {lang:'zh'});
+  /* 前面的小节动过自定义槽和练习会话，这里复位到「第一次打开」的状态 */
+  DB.custom = {custom1:null, custom2:null};
+  DB.activeKey = null;                    /* ★ 刚打开时没有任何难度档被选中 */
+  sanitizeSettings();                     /* 真实加载路径：空槽被 A2 预填充 */
+  SESS = {history:[], cur:-1, right:0, done:0, recent:[]};
+  saveDB(); show('scr-menu'); renderMenu();
+
+  ck('★ 刚打开：没有任何难度档被选中（6 个键全不亮）',
+     [...document.querySelectorAll('#m-presets .key')]
+       .every(b=>b.getAttribute('aria-pressed')==='false'), true);
+  ck('★ 刚打开：面板收起、高度为 0',
+     (()=>{ const p = document.getElementById('m-custom');
+            return !p.classList.contains('on') && p.offsetHeight === 0; })(), true);
+  ck('★ 刚打开：不选档也能直接开始（用默认设置）',
+     !document.getElementById('m-start').disabled, true);
+
+  ck('键一共 6 个（4 预设 + 2 自定义）',
+     document.querySelectorAll('#m-presets .key').length, 6);
+  ck('预设键顺序', [...document.querySelectorAll('#m-presets [data-preset]')].map(b=>b.dataset.preset),
+     ['starter','build','verbs','exam']);
+  ck('两个自定义槽排在最后',
+     [...document.querySelectorAll('#m-presets .key')].slice(4).map(b=>b.dataset.custom),
+     ['custom1','custom2']);
+  ck('每个预设都报出可用动词数',
+     /个动词/.test(pBtn('build').textContent), true);
+  ck('自定义槽预填充了 A2（键上直接是摘要，不再是「还没设置」）',
+     cBtn('custom1').textContent.indexOf('A2 词库') >= 0
+     && cBtn('custom1').textContent.indexOf('还没设置') < 0, true);
+
+  /* 点预设：立即生效、停在菜单、不开始答题、不改练习模式、不动齿轮设置 */
+  DB.settings.modes = ['transfer'];
+  const gVos = DB.settings.vosotros, gHide = DB.settings.hideInf;
+  const gShowZh = DB.settings.showZh, gStrict = DB.settings.strictAccent;
+  saveDB(); renderMenu();
+  pBtn('starter').click();
+  ck('点预设停在菜单上', document.getElementById('scr-menu').classList.contains('hidden'), false);
+  ck('点预设没有生成任何题目', SESS.history.length, 0);
+  ck('点预设没有打开练习页',
+     document.getElementById('scr-practice').classList.contains('hidden'), true);
+  ck('面板展开（显示这套设置）', document.getElementById('m-custom').classList.contains('on'), true);
+  ck('预设面板是只读的：没有编辑控件',
+     document.querySelectorAll('#m-pick-body .chip, #m-pick-body .tgroup').length, 0);
+  ck('预设面板列了 1 词库 / 2 时态 / 3 其它',
+     [...document.querySelectorAll('#m-pick-body .hint b')].map(e=>e.textContent.trim()).slice(0,3),
+     ['1 · 词库','2 · 时态','3 · 其它']);
+  ck('★ 预设面板没有「应用这套设置」按钮（点键即生效，按钮只在自定义下）',
+     !!document.getElementById('m-key-apply'), false);
+  ck('★ 预设面板没有「这一套xxx」冗余行',
+     document.getElementById('m-pick-body').textContent.indexOf('这一套') < 0, true);
+  ck('★ 预设不改练习模式（仍是平移）', DB.settings.modes, ['transfer']);
+  ck('★ 预设不动全局项 vosotros', DB.settings.vosotros, gVos);
+  ck('★ 预设不动全局项 hideInf', DB.settings.hideInf, gHide);
+  ck('★ 预设不动齿轮设置 显示中文释义', DB.settings.showZh, gShowZh);
+  ck('★ 预设不动齿轮设置 严格重音', DB.settings.strictAccent, gStrict);
+  ck('★ 点预设立即生效：等级 = A1', DB.settings.levels, ['A1']);
+  ck('★ 点预设立即生效：时态 = 只练现在时', DB.settings.tenses, ['p']);
+  ck('★ 点预设立即生效：答题方式跟着预设走（选择题）', DB.settings.inputMode, 'choice');
+  ck('应用后给一句回执',
+     document.getElementById('m-preset-warn').textContent.indexOf('已应用') >= 0, true);
+  ck('键上写了范围', /A1 词库 · 现在时/.test(pBtn('starter').textContent), true);
+
+  /* 辨认模式默认问时态（多时态时）；单时态预设（如 starter 只练现在时）自动跳过 ——
+     这是内置逻辑（recAskTense），不再作为预设里的开关。预设 cfg 也不应再带 askTense 字段。 */
+  ck('预设 cfg 不再携带 askTense 字段',
+     PRESETS.every(p => !('askTense' in p.cfg)), true);
+
+  /* 高亮 = 六选一的**单选**：只认当前选中的那一档（互斥），与练习模式无关。
+     以前是「设置正好等于某个预设就亮」，于是点了自定义之后预设还亮着，
+     看起来像没点动 —— 现在钉死这一点。 */
+  ck('starter 高亮', pressed('starter'), 'true');
+  ck('六档里只有一个亮',
+     [...document.querySelectorAll('#m-presets .key[aria-pressed="true"]')].length, 1);
+  DB.settings.modes = ['recognize']; renderMenu();
+  ck('只改练习模式不影响高亮（题型独立）', pressed('starter'), 'true');
+  pBtn('verbs').click();
+  ck('切到 verbs 后高亮跟着走', [pressed('starter'), pressed('verbs')], ['false','true']);
+  ck('切档后仍然只有一个亮',
+     [...document.querySelectorAll('#m-presets .key[aria-pressed="true"]')].length, 1);
+  ck('预设 verbs：等级 = A2+B1', DB.settings.levels, ['A2','B1']);
+  ck('预设 verbs：8 个时态', DB.settings.tenses.length, 8);
+  ck('B1 那一档叫「进阶 · B1 八时态」',
+     pBtn('verbs').querySelector('.pn').textContent, '进阶 · B1 八时态');
+  /* 多时态预设（verbs 含 6 个简单时态）下，辨认题默认问时态 */
+  DB.settings.modes = ['recognize']; saveDB();
+  ck('多时态预设 verbs 下辨认题默认问时态',
+     (()=>{ let seen=null;
+            for(let i=0;i<80 && seen===null;i++){ const x = makeQuestion();
+              if(x && x.mode==='recognize' && x.tense && !T[x.tense].cp) seen = x.askTense; }
+            return seen; })(), true);
+  pBtn('exam').click();
+  ck('预设 exam：全部 15 个时态', DB.settings.tenses.length, 15);
+  ck('预设 exam：严格重音', DB.settings.strictAccent, true);
+  ck('每个档都可键盘操作（预设是按钮、自定义是 role=button 且可聚焦）',
+     [...document.querySelectorAll('#m-presets [data-preset]')].every(b=>b.tagName === 'BUTTON')
+     && [...document.querySelectorAll('#m-presets .key[data-custom]')]
+          .every(b=>b.getAttribute('role') === 'button' && b.getAttribute('tabindex') === '0'), true);
+
+  /* 从菜单启动练习，退出后档的高亮还在 */
+  document.getElementById('m-start').click();
+  ck('从菜单能正常开始练习', SESS.history.length > 0, true);
+  document.getElementById('p-exit').click();
+  show('scr-menu'); renderMenu();
+  ck('退出练习后回到菜单', document.getElementById('scr-menu').classList.contains('hidden'), false);
+  ck('档的高亮保留', pressed('exam'), 'true');
+
+  /* ============================================================
+     34b. 自定义槽：可选择、可编辑、实时保存，且预设不会覆盖它
+     ============================================================ */
+  /* ★ 点自定义档之后，预设档必须弹起（六选一互斥）。
+     这一步用「刚应用过预设、设置正好等于该预设」的状态来验 —— 正是当初的翻车场景：
+     旧实现让「设置等于预设」也点亮，于是点了自定义，零基础那一档还亮着，
+     看起来像没点动，面板也没跟着换内容。 */
+  cBtn('custom2').click();
+  ck('★ 点自定义档后，预设档弹起',
+     [...document.querySelectorAll('#m-presets [data-preset]')]
+       .map(b => b.getAttribute('aria-pressed')), ['false','false','false','false']);
+  ck('★ 自定义档高亮', cBtn('custom2').getAttribute('aria-pressed'), 'true');
+  ck('★ 六档里始终只有一个亮',
+     document.querySelectorAll('#m-presets .key[aria-pressed="true"]').length, 1);
+  ck('★ 自定义档不再自动展开内联面板（编辑走键上的「编辑」模态）',
+     document.getElementById('m-custom').classList.contains('on'), false);
+  ck('★ 内联面板里没有自定义的编辑控件',
+     document.querySelectorAll('#m-pick-body .sec').length, 0);
+  /* 点键右侧的「编辑」→ 编辑模态弹出，里面是同一套三节编辑面板 */
+  cBtn('custom2').querySelector('.key-edit').click();
+  ck('★ 点「编辑」弹出模态',
+     document.getElementById('cmodal').classList.contains('on'), true);
+  ck('★ 模态里是自定义的三节（1 词库 / 2 时态 / 3 其它）',
+     [...document.querySelectorAll('#cm-body .sec')].map(e=>e.textContent.trim()),
+     ['1 · 词库','2 · 时态','3 · 其它']);
+  ck('★ 模态里有答题方式分段控件', !!document.getElementById('m-seg'), true);
+  ck('★ 模态里没有「辨认模式同时问时态」（选项已删除）',
+     document.querySelector('#cm-body [data-opt="askTense"]'), null);
+  ck('★ 模态里没有「显示中文释义」（已移到齿轮设置）',
+     document.querySelector('#cm-body [data-opt="showZh"]'), null);
+  ck('★ 模态里没有「严格要求重音」（已移到齿轮设置）',
+     document.querySelector('#cm-body [data-opt="strictAccent"]'), null);
+  ck('★ 模态里没有气泡样式的开关残留',
+     document.querySelectorAll('#cm-body .chip[data-opt]').length, 0);
+  /* Esc 关掉模态：回普通选中态（键亮、内联面板收着） */
+  document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape'}));
+  ck('★ Esc 关掉模态',
+     !document.getElementById('cmodal').classList.contains('on'), true);
+  ck('★ 关掉模态后自定义键仍高亮', cBtn('custom2').getAttribute('aria-pressed'), 'true');
+  ck('★ 关掉模态后内联面板仍收起',
+     document.getElementById('m-custom').classList.contains('on'), false);
+
+  cBtn('custom1').click();
+  ck('点自定义槽只选中（面板不展开）',
+     document.getElementById('m-custom').classList.contains('on'), false);
+  cBtn('custom1').querySelector('.key-edit').click();
+  ck('custom1 的编辑模态里有等级 / 标签 / 时态控件',
+     !!document.querySelector('#cm-body #m-levels .chip')
+     && !!document.querySelector('#cm-body #m-tags .chip')
+     && !!document.querySelector('#cm-body #m-tenses .chip'), true);
+  ck('custom1 高亮（当前选中的就是它）', cBtn('custom1').getAttribute('aria-pressed'), 'true');
+  ck('预设键此时不亮', pressed('exam'), 'false');
+
+  /* 改一改 → 实时存进 custom1 */
+  const lvA1 = [...document.querySelectorAll('#m-levels .chip')].filter(b=>b.dataset.lv==='A1')[0];
+  const lvBefore = DB.settings.levels.slice();
+  lvA1.click();
+  ck('点等级即时生效', DB.settings.levels.includes('A1'), !lvBefore.includes('A1'));
+  ck('改动已存进 custom1', !!DB.custom.custom1, true);
+  ck('custom1 记下了等级', DB.custom.custom1.levels.slice().sort(),
+     DB.settings.levels.slice().sort());
+  ck('★ 自定义键上写着内容摘要（词库 / 时态 / 动词数）',
+     /词库/.test(cBtn('custom1').textContent)
+     && /个时态/.test(cBtn('custom1').textContent)
+     && /个动词/.test(cBtn('custom1').textContent), true);
+  ck('★ 编辑模态底栏有「应用这套设置」', !!document.getElementById('cm-apply'), true);
+  document.getElementById('cm-apply').click();
+  ck('★ 应用后模态关闭',
+     !document.getElementById('cmodal').classList.contains('on'), true);
+  ck('★ 应用后弹「✅ 修改成功」',
+     document.getElementById('toast').classList.contains('on')
+     && document.getElementById('toast').textContent.indexOf('✅ 修改成功') >= 0, true);
+  ck('★ 应用给「已切到」回执',
+     document.getElementById('m-preset-warn').textContent.indexOf('已切到') >= 0, true);
+  ck('★ 应用后仍是这个自定义槽高亮', cBtn('custom1').getAttribute('aria-pressed'), 'true');
+
+  /* 切到 custom2：是另一套（A2 预填充），custom1 不会被带过去 */
+  const c1Levels = DB.custom.custom1.levels.slice();
+  cBtn('custom2').click();
+  ck('点 custom2 只选中（面板不展开）',
+     document.getElementById('m-custom').classList.contains('on'), false);
+  ck('custom2 预填充了 A2', DB.custom.custom2.levels, ['A2']);
+  ck('custom1 的设置原样保留', DB.custom.custom1.levels.slice(), c1Levels);
+  cBtn('custom1').click();
+  ck('切回 custom1 设置被载回来', DB.settings.levels.slice().sort(), c1Levels.slice().sort());
+
+  /* ★ 面板高度跟着内容走：预设面板展开 ↔ 切到自定义必须收成 0，不留大段空白 */
+  const popBox = document.getElementById('m-custom');
+  popBox.style.transition = 'none';        /* 量最终高度，别量到动画中途 */
+  pBtn('starter').click();
+  const openH = popBox.offsetHeight;
+  cBtn('custom1').click();
+  const closedH = popBox.offsetHeight, contentH = popBox.scrollHeight;
+  popBox.style.transition = '';
+  ck('★ 切到自定义后内联面板收成 0（不留大段空白）',
+     closedH <= 1 && closedH < openH - 40, true);
+
+  /* ★ 预设键绝不覆盖自定义槽 */
+  const c1Before = JSON.stringify(DB.custom.custom1);
+  pBtn('exam').click();
+  ck('★ 应用预设后 custom1 原封不动', JSON.stringify(DB.custom.custom1), c1Before);
+  ck('★ 点预设后高亮跟到那个预设（custom1 的配置仍存在 DB.custom 里随时载回）',
+     DB.activeKey, 'exam');
+  cBtn('custom1').click();
+  ck('★ 点回 custom1，它保存的配置又被载回来',
+     DB.settings.levels.slice().sort(), JSON.parse(c1Before).levels.slice().sort());
+
+  /* 恢复默认（编辑模态底栏）：回到 A2 预填充 */
+  cBtn('custom1').querySelector('.key-edit').click();
+  ck('编辑模态有「恢复默认」', !!document.getElementById('cm-reset'), true);
+  document.getElementById('cm-reset').click();
+  ck('恢复默认后 custom1 回到 A2 预填充', DB.custom.custom1.levels, ['A2']);
+  ck('恢复默认不动练习模式', DB.settings.modes.length, 1);
+  document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape'}));
+  ck('收尾：模态已关', !document.getElementById('cmodal').classList.contains('on'), true);
+
+  /* ============================================================
+     35. 选择题：选项补齐（4~6 个）+ 网格列数自适应，不再是 3+1
+     ============================================================ */
+  DB.settings = Object.assign(defaultSettings(), {
+      lang:'zh', levels:['A1'], modes:['produce'], inputMode:'choice',
+      tenses:['p'], onlyWrong:false, vosotros:true});
+  syncTenseOrder(); saveDB();
+  const kinds = new Set();
+  let optMin = 9, optMax = 0, optDup = 0, optHasAns = 0, optTen = 0;
+  for(let i=0;i<80;i++){
+    const q = makeQuestion();
+    if(!q || !q.options) continue;
+    const o = q.options;
+    optMin = Math.min(optMin, o.length); optMax = Math.max(optMax, o.length);
+    if(new Set(o.map(norm)).size !== o.length) optDup++;
+    if(o.indexOf(q.answer) < 0) optHasAns++;
+    /* 选项里不该出现第二个「同样算对」的形式（只有平移模式有备选答案） */
+    if((q.answersAlt||[]).some(x => o.indexOf(x) >= 0)) optTen++;
+    kinds.add(o.length);
+  }
+  ck('选择题选项数落在 4~6 之间', optMin >= 4 && optMax <= 6, true);
+  ck('到过 6 个选项（不再固定 4 个）', optMax, 6);
+  ck('选项没有重复', optDup, 0);
+  ck('选项里一定有正确答案', optHasAns, 0);
+  ck('「同样算对」的备选不当干扰项（题面含糊时不该出现两个正确答案）', optTen, 0);
+
+  const qOpt = makeQuestion();
+  SESS.history = [qOpt]; SESS.cur = 0; show('scr-practice'); renderPractice();
+  ck('选项按钮数与数据一致',
+     document.querySelectorAll('#p-choices .opt').length, qOpt.options.length);
+  /* 样式表里确实写的是 auto-fit（列数跟着容器走），而不是写死的 3 列 */
+  ck('选项网格规则用 auto-fit 自适应列数', (()=>{
+       let hit = '';
+       for(const sh of document.styleSheets){
+         let rules; try{ rules = sh.cssRules; }catch(e){ continue; }
+         for(const r of rules){
+           if(r.selectorText === '.opts.three' && /auto-fit/.test(r.style.gridTemplateColumns)) hit = r.style.gridTemplateColumns;
+         }
+       }
+       return hit; })().indexOf('auto-fit') >= 0, true);
+  /* 网格确实铺开成多列，而不是挤成一列 */
+  ck('选项网格是多列', (()=>{
+       const cols = getComputedStyle(document.getElementById('p-choices')).gridTemplateColumns.split(' ').length;
+       return cols >= 3; })(), true);
+  ck('选项里就是变位词形本身（纯文本按钮，data-v 与文案一致）',
+     [...document.querySelectorAll('#p-choices .opt')].map(b=>b.textContent),
+     qOpt.options)
+  && ck('选项按钮带 data-v', [...document.querySelectorAll('#p-choices .opt')].every(b=>b.dataset.v===b.textContent), true);
+
+  /* 点选项：只有新选中的那个跳一次（微动效类），不再点同一个不会重播 */
+  const optBtns = [...document.querySelectorAll('#p-choices .opt')];
+  optBtns[0].click();
+  ck('点选项后该选项被选中', optBtns[0].classList.contains('sel'), true);
+  ck('同一行里只有一个选项是选中的',
+     optBtns.filter(b=>b.classList.contains('sel')).length, 1);
+  const fx0 = optBtns[0].classList.contains('fxsel');
+  optBtns[0].click();
+  ck('再点同一个不会重复播动画', fx0 && optBtns[0].classList.contains('fxsel'), fx0);
+
+  /* ============================================================
+     36. 判分微动效：手写模式的绿/红描边 + 答错的抖动
+     ============================================================ */
+  DB.settings = Object.assign(defaultSettings(), {
+      lang:'zh', levels:['A1'], modes:['produce'], inputMode:'type',
+      tenses:['p'], onlyWrong:false, strictAccent:true});
+  syncTenseOrder(); saveDB();
+  const fxQ = (()=>{
+    /* 诊断句只在该形式真的带分类码（s 词干 / i 不规则）时才给。
+       出题是随机的，可能落在全规则动词上 —— 这里直接抽一道带码的题，断言不飘 */
+    for(let i=0;i<400;i++){
+      const x = makeQuestion();
+      const c = (codesOf(byInf[x.inf], x.tense) || '')[x.person] || '.';
+      if(c === 's' || c === 'i') return x;
+    }
+    return makeQuestion();
+  })();
+  ck('抽到了带分类码的题（前置条件）', !!fxQ, true);
+  SESS.history = [fxQ]; SESS.cur = 0; show('scr-practice'); renderPractice();
+  const fxIn = document.getElementById('p-input');
+  fxIn.value = '~~~';                       // 一定判错
+  fxIn.dispatchEvent(new Event('input', {bubbles:true}));
+  submitAnswer();                           // 等价于点「确认」
+  ck('答错后输入框带错误描边类', fxIn.classList.contains('bad'), true);
+  ck('答错后有抖动动画类（或系统要求减少动效时不给）',
+     fxIn.classList.contains('fxbad') || !FX_ON, true);
+  ck('答错时给出了「错在哪一类」的诊断', !!fxQ.diag, true);
+  ck('诊断出现在反馈里',
+     document.getElementById('p-feedback').textContent.indexOf(fxQ.diag) >= 0, true);
+
+  /* 换到下一题后，判定色不该跟着跑过去 */
+  document.getElementById('p-go').click();
+  const fxIn2 = document.getElementById('p-input');
+  ck('新题的输入框没有上一题的判定色',
+     fxIn2 && !fxIn2.classList.contains('bad') && !fxIn2.classList.contains('ok'), true);
+  ck('新题输入框是空的', fxIn2.value, '');
+
+  /* ============================================================
+     38. 选择题的选项永远合法：正确答案必须在里面
+         （用户报过「转换 / 平移模式没有正确选项」——这一节把它钉死）
+     ============================================================ */
+  function optInvariant(mode, tenses, label){
+    DB.settings = Object.assign(defaultSettings(), {levels:['A1','A2'],
+        modes:[mode], tenses: tenses.slice(), inputMode:'choice',
+        hideInf:false, onlyWrong:false, showZh:true});
+    syncTenseOrder(); saveDB();
+    SESS = {history:[],cur:-1,right:0,done:0,recent:[]};
+    let n = 0, noAns = 0, dup = 0, bad = 0, altAsDistr = 0, lenBad = 0;
+    for(let i=0;i<240;i++){
+      const q = makeQuestion();
+      if(!q || !q.options || q.mode !== mode) continue;
+      n++;
+      const o = q.options, no = o.map(norm);
+      if(no.indexOf(norm(q.answer)) < 0) noAns++;
+      if(new Set(no).size !== no.length) dup++;
+      if(o.length < 4 || o.length > 6) lenBad++;
+      (q.answersAlt || []).forEach(x => { if(no.indexOf(norm(x)) >= 0) altAsDistr++; });
+      /* 每个选项都必须是这个动词真实存在的某个形式，且**不能是本题正确答案的另一种写法** */
+      const vv = VERBS[q.idx];
+      const allForms = new Set();
+      TENSES.forEach(t => { const f = forms(vv, t.k); if(f) f.forEach(x => x && allForms.add(norm(x))); });
+      o.forEach(x => { if(!allForms.has(norm(x))) bad++; });
+    }
+    ck(label+'：抽样出题足够（'+n+' 题）', n > 100, true);
+    ck(label+'：正确答案永远在选项里', noAns, 0);
+    ck(label+'：选项没有重复', dup, 0);
+    ck(label+'：选项数在 4~6', lenBad, 0);
+    ck(label+'：选项都是该动词真实的形式', bad, 0);
+    ck(label+'：同样算对的备选不会当干扰项', altAsDistr, 0);
+  }
+  optInvariant('shift',    ['p','pr','i','pp','sp','si'], '转换模式');
+  optInvariant('transfer', ['p','pr','i','pp'],           '平移模式');
+  optInvariant('produce',  ['p','pr'],                    '复现模式');
+
+  /* ★ 「选项里没有正确答案」的根因：渲染时读的是**会变的**全局设置，
+     而选项 / 正确答案是按**出题那一刻**的设置算好的。现在出题时把设置拍进 q.s，
+     渲染只读 q.s —— 下面把这个场景钉死。
+     复现模式出的题没有 q.answer2（转换模式才需要它），旧代码在转换模式下回看时
+     因为读 q.mode 而去找 q.answer2，于是"怎么点都没有一个选项被判对"。 */
+  DB.settings = Object.assign(defaultSettings(), {levels:['A1'], modes:['produce'],
+      tenses:['p'], inputMode:'choice'});
+  syncTenseOrder(); saveDB();
+  SESS = {history:[],cur:-1,right:0,done:0,recent:[]};
+  const qCross = makeQuestion();
+  ck('跨模式用例：拿到一道复现模式的选择题',
+     !!qCross && qCross.mode === 'produce' && !!qCross.options, true);
+  ck('跨模式用例：复现模式确实没有 answer2', typeof qCross.answer2, 'undefined');
+  ck('出题时把设置拍进了快照 q.s', !!qCross.s && qCross.s.inputMode === 'choice', true);
+  SESS.history = [qCross]; SESS.cur = 0; show('scr-practice'); renderPractice();
+  const nOptBefore = document.querySelectorAll('#p-choices .opt').length;
+
+  /* 模拟：中途把全局设置改成「转换模式 + 手写」 */
+  DB.settings.modes = ['shift'];
+  DB.settings.inputMode = 'type';
+  renderPractice();
+  ck('★ 换模式后这道题仍然按出题时的模式渲染（仍是选择题）',
+     document.querySelectorAll('#p-choices .opt').length, nOptBefore);
+  ck('★ 换模式后输入框不会冒出来（辨认/选择模式不会变成手写）',
+     document.getElementById('p-input'), null);
+  ck('★ 选项里仍然有正确答案',
+     [...document.querySelectorAll('#p-choices .opt')]
+       .map(b=>b.dataset.v).indexOf(qCross.answer) >= 0, true);
+  ck('★ 这道题没有被中途换掉', SESS.history[SESS.cur], qCross);
+
+  /* 反过来：手写题在中途被改成选择时，也要照样渲染成输入框 */
+  DB.settings = Object.assign(defaultSettings(), {levels:['A1'], modes:['produce'],
+      tenses:['p'], inputMode:'type'});
+  syncTenseOrder(); saveDB();
+  SESS = {history:[],cur:-1,right:0,done:0,recent:[]};
+  const qType = makeQuestion();
+  ck('跨模式用例 2：拿到一道手写题（快照记的是 type）',
+     !!qType && !!qType.s && qType.s.inputMode === 'type', true);
+  SESS.history = [qType]; SESS.cur = 0; renderPractice();
+  DB.settings.inputMode = 'choice'; renderPractice();
+  ck('★ 手写题被改成选择后仍渲染输入框',
+     !!document.getElementById('p-input'), true);
+  ck('★ 也不会突然冒出选项区', document.getElementById('p-choices'), null);
+
+
+  /* ============================================================
+     37. 等级表（含 C1/C2）与自复动词支持
      ============================================================ */
   /* 等级表：模板里必须和 build_final.py 一致，否则加的词会静默抽不到 */
   ck('LEVELS 含 C1/C2', LEVELS, ['A1','A2','B1','B2','C1','C2']);
 
   /* 词表里 C1/C2 已经有真词了 → 六个等级都该画出来，且默认全选 */
   DB.settings = Object.assign(defaultSettings(), {lang:'zh'});
-  syncTenseOrder(); saveDB(); renderMenu();
+  syncTenseOrder(); saveDB();
+  /* 等级 chip 画在自定义编辑模态里：先把 custom1 同步成当前设置再打开编辑器 */
+  DB.custom.custom1 = {levels: DB.settings.levels.slice(), tenses: DB.settings.tenses.slice(),
+                       tagFilter:'', showZh:true, strictAccent:true, inputMode:'type'};
+  openCustomModal('custom1');
   const lvBtns = () => [...document.querySelectorAll('#m-levels .chip')].map(b => b.dataset.lv);
   ck('六个等级都画出来（词表里都有动词）', lvBtns(), ['A1','A2','B1','B2','C1','C2']);
   ck('默认等级 = 词表里实际存在的等级', DB.settings.levels.slice(), ['A1','A2','B1','B2','C1','C2']);
@@ -2279,6 +2811,8 @@
   DB.settings = Object.assign(defaultSettings(), {lang:'zh'});
   syncTenseOrder(); saveDB(); renderMenu();
   ck('词补回来后按钮又出现', lvBtns(), ['A1','A2','B1','B2','C1','C2']);
+  /* 收尾：关掉编辑模态，别影响后面的小节 */
+  document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape'}));
 
   /* 自复动词：识别 + 答案要带代词 + 提示语 + 右栏着色 —— 全部用真词 */
   ck('isRefl 认得出自复动词',

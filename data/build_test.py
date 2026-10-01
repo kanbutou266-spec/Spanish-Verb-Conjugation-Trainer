@@ -23,10 +23,7 @@ def main():
     if not os.path.isdir(OUT):
         os.makedirs(OUT)
 
-    shim = ("function __start(){\n"
-            "  SESS={history:[],cur:-1,right:0,done:0,recent:[]};\n"
-            "  var q=makeQuestion(); SESS.history.push(q); SESS.cur=0;\n"
-            "  show('scr-practice'); renderPractice();\n}\n")
+    shim = ("function __start(){ startPractice(); }\n")
 
     # 1) 回归测试页
     js = io.open(TEST, encoding="utf-8").read()
@@ -72,7 +69,7 @@ def main():
         "localStorage.removeItem('es_conj_app_v1');"
         "DB.settings=defaultSettings(); DB.settings.levels=['A1','A2','B1','B2'];"
         "DB.settings.tenses=ALL_TENSE_KEYS.slice(); DB.settings.modes=['recognize'];"
-        "DB.settings.askTense=true; DB.settings.showZh=true; saveDB(); __start();")
+        "DB.settings.showZh=true; saveDB(); __start();")
     # 变位表（右栏）：查询模式 —— 拉开右栏看某个动词
     cases["table"] = (
         "localStorage.removeItem('es_conj_app_v1');"
@@ -81,13 +78,15 @@ def main():
     # 同形反馈：comprar 的 compramos（现在时 = 简单过去时）
     _rec = ("function __rec(inf, tense, person, pickTense){"
             "DB.settings=defaultSettings(); DB.settings.levels=['A1','A2','B1','B2'];"
-            "DB.settings.tenses=['p','pr']; DB.settings.modes=['recognize'];"
-            "DB.settings.askTense=true; DB.settings.showZh=true; saveDB();"
+            "DB.settings.tenses=ALL_TENSE_KEYS.filter(function(k){"
+            "  return (T[k].cp?1:0)===(T[tense].cp?1:0);});"
+            "DB.settings.modes=['recognize']; DB.settings.showZh=true; saveDB();"
             "var v=byInf[inf], f=forms(v,tense);"
             "var q={inf:inf, idx:VERBS.indexOf(v), zh:v.z, g:v.g, lv:v.l, mode:'recognize',"
             " tense:tense, person:person, answer:f[person], userAnswer:null, correct:null,"
-            " pickPerson:null, pickTense:null, hits:formHits(v,f[person])};"
+            " pickPerson:null, pickTense:null, askTense:true, hits:formHits(v,f[person])};"
             "SESS={history:[q],cur:0,right:0,done:0,recent:[]}; show('scr-practice'); renderPractice();"
+            "var ii=document.getElementById('p-inf'); ii.value=inf; ii.dispatchEvent(new Event('input'));"
             "document.querySelectorAll('#p-persons .opt')[person].click();"
             "var c=[].slice.call(document.querySelectorAll('#p-tenses .chip'))"
             "  .filter(function(b){return b.dataset.tense===pickTense;})[0];"
@@ -104,12 +103,13 @@ def main():
     # 辨认模式：简单题 / 复合题各自只出同类选项（截图核对配色与单列排布）
     _recq = ("function __recq(inf, tense, person){"
              "DB.settings=defaultSettings(); DB.settings.levels=['A1','A2','B1','B2'];"
-             "DB.settings.tenses=[tense]; DB.settings.modes=['recognize'];"
-             "DB.settings.askTense=true; DB.settings.showZh=true; saveDB();"
+             "DB.settings.tenses=ALL_TENSE_KEYS.filter(function(k){"
+             "  return (T[k].cp?1:0)===(T[tense].cp?1:0);});"
+             "DB.settings.modes=['recognize']; DB.settings.showZh=true; saveDB();"
              "var v=byInf[inf], f=forms(v,tense);"
              "var q={inf:inf, idx:VERBS.indexOf(v), zh:v.z, g:v.g, lv:v.l, mode:'recognize',"
              " tense:tense, person:person, answer:f[person], userAnswer:null, correct:null,"
-             " pickPerson:null, pickTense:null, hits:formHits(v,f[person])};"
+             " pickPerson:null, pickTense:null, askTense:true, hits:formHits(v,f[person])};"
              "SESS={history:[q],cur:0,right:0,done:0,recent:[]}; show('scr-practice'); renderPractice();}\n")
     cases["rec_simple"] = ("localStorage.removeItem('es_conj_app_v1');" + _recq +
                            "__recq('comprar','p',3);")

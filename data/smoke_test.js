@@ -28,6 +28,7 @@ global.document = {
   querySelectorAll() { return []; },
   createElement(tag) { return mkEl(tag); },
   onkeydown: null,
+  addEventListener() {},
 };
 const store = {};
 global.localStorage = {
@@ -186,17 +187,10 @@ eq('统计答题数', DB.stats.total.att, 50);
 eq('统计错误数', DB.stats.total.err, 25);
 eq('错题本记录', DB.stats.wrong.length, 25);
 
-/* 8. 只练错题模式 */
+/* 8. 「只练我的错题」已下线：设置里的 onlyWrong 会被 sanitize 清掉，出题不再按错题过滤 */
 settings.onlyWrong = true;
-DB.settings.levels = ['A1'];
-let ow = 0, owBad = 0;
-for (let i = 0; i < 50; i++) {
-  const q = makeQuestion();
-  if (q && DB.stats.verbs[q.inf] && DB.stats.verbs[q.inf].err > 0) ow++;
-  else owBad++;
-}
-console.log('只练错题: 命中', ow, '未命中', owBad);
-t('只练错题只出错题', owBad === 0);
+sanitizeSettings();
+t('onlyWrong 已下线（设置里被清除）', DB.settings.onlyWrong === undefined);
 
 /* 9. 复习历史不重复计数 */
 settings.onlyWrong = false;

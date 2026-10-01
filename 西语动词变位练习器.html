@@ -41,8 +41,9 @@ h2:first-child{margin-top:0}
 button{font:inherit;color:inherit;cursor:pointer}
 .chip{
   border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 14px; font-size:14px;
-  transition:.12s; white-space:nowrap; user-select:none;
+  transition:.12s; white-space:nowrap; user-select:none; display:inline-flex;align-items:center;gap:5px;
 }
+.chip svg{flex:none;vertical-align:-3px}
 .chip:hover{border-color:#c9d3e6;background:#fafbff}
 .chip[aria-pressed="true"]{background:var(--g,var(--accent));border-color:var(--g,var(--accent));color:#fff;font-weight:600}
 .chip.sm{padding:5px 11px;font-size:13px}
@@ -79,6 +80,13 @@ button{font:inherit;color:inherit;cursor:pointer}
 .fh .note{color:var(--accent);font-weight:600;margin-left:6px}
 .hint{font-size:13px;color:var(--sub);line-height:1.6}
 .verb-big{font-size:34px;font-weight:700;letter-spacing:.5px;line-height:1.25;word-break:break-word}
+/* 辨认模式：强制隐藏原形，改成让玩家手写出原形的输入框 */
+.inflbl{flex:none;font-size:13px;font-weight:700;color:var(--sub)}
+.inf-input{flex:1;min-width:0;width:100%;max-width:340px;font-size:18px;font-weight:600;
+  padding:8px 11px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
+.inf-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.inf-input.ok{border-color:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}
+.inf-input.bad{border-color:var(--bad);box-shadow:0 0 0 3px #fdecec}
 .verb-mid{font-size:22px;font-weight:650}
 /* 题干里的原形行：显示原形 与「隐藏成一个按钮」两种状态共用一层固定高度的壳。
    隐藏态整行就是那个按钮本身（原来的 ? ? ? 占位已去掉），
@@ -106,14 +114,21 @@ button{font:inherit;color:inherit;cursor:pointer}
 .pill.g-ind,.pill.g-cond,.pill.g-sub,.pill.g-imp{background:var(--gs);color:var(--gi)}
 .qbox{border:1px dashed #cfd6e4;border-radius:12px;padding:16px;background:#fbfcfe;text-align:center}
 .opts{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
-.opts.three{grid-template-columns:1fr 1fr 1fr}
+/* 选择题：选项个数不固定（4~6 个），列数跟着容器走。
+   auto-fit + minmax(148px,1fr)：750px 的卡里落到 4 列（每列约 179px），
+   6 个选项排成 4+2、4 个选项正好一行 —— 以前写死 3 列，4 个选项排成 3+1，右下留个空格。 */
+.opts.three{grid-template-columns:repeat(auto-fit,minmax(148px,1fr))}
 /* 人称选项：第一行单数（yo/tú/él），第二行复数（nosotros/vosotros/ellos） */
 .opts.persons{display:flex;flex-direction:column;gap:8px}
 .opts.persons .orow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .opts.persons .opt{padding:11px 8px;font-size:15px;line-height:1.3}
 .opts.persons .opt .pol{display:block}
-.opts.persons .opt .pol .s{display:none}
 .opts.persons .opt small{margin-top:3px}
+/* 选项里的主标签：人称是西语代词组（él / ella / usted），选择题是词形。
+   .w 用 <i> 是为了留一个和旧结构同名的钩子，样式上必须是正体、不可加粗过多 ——
+   一整组代词在窄屏会折成两行，靠 line-height 保持整齐。 */
+.opt .pol{display:block;line-height:1.3;word-break:break-word}
+.opt .pol .w,.opt .pol i{font-style:normal;font-weight:650}
 /* 人称 × 形式小网格（答案对照 / 变位表）：同样第一行单数、第二行复数 */
 .pgrid{margin-top:10px;display:flex;flex-direction:column;gap:4px}
 .pgrid .prow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
@@ -152,11 +167,47 @@ button{font:inherit;color:inherit;cursor:pointer}
 .chip.rev-ok,.chip.tint.rev-ok{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
 .chip.rev-bad,.chip.tint.rev-bad{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
 .opt small{display:block;font-weight:400;font-size:12px;opacity:.7;margin-top:2px}
+/* 点选的即时反馈：选中态轻微下沉一下（只跳一次，不常驻） */
+@keyframes optPop{0%{transform:scale(.97)}60%{transform:scale(1.015)}100%{transform:none}}
+.opt.fxsel{animation:optPop .16s ease-out 1}
+/* 反馈面板：读屏用户原来完全听不到判分结果（整屏重绘，没有 aria-live）。
+   这里加一个只给辅助技术看的播报区，判分时写一句「回答正确 / 错误」。
+   注意用 clip 而不是 display:none —— 后者连读屏也读不到。 */
+.sr-only{
+  position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;
+  overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;
+}
+div.sr-only.live{position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden}
 input[type=text]{
   width:100%;font:inherit;font-size:20px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;
   background:#fff;outline:none;transition:.12s;
 }
 input[type=text]:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+/* 判分的即时反馈：只动 border / box-shadow，绝不动字号内边距 ——
+   输入框的宽高一旦变一点，题干下方所有内容都会跟着跳。 */
+input[type=text].ok{border-color:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}
+input[type=text].bad{border-color:var(--bad);box-shadow:0 0 0 3px var(--bad-soft)}
+/* 输入框边界脉冲两次（不位移、不改尺寸）；答错时整框轻微抖动。
+   两条都放在 prefers-reduced-motion:no-preference 里：
+   ① 尊重系统「减少动态效果」；② 回归测试量位置前只关得掉 transition，
+      关不掉 animation —— 把动画关在媒体查询里，默认环境下断言才安全。 */
+@media (prefers-reduced-motion:no-preference){
+  @keyframes iptOkPulse{
+    0%  {box-shadow:0 0 0 3px rgba(18,133,90,.34)}
+    100%{box-shadow:0 0 0 3px var(--ok-soft)}
+  }
+  @keyframes iptBadPulse{
+    0%  {box-shadow:0 0 0 3px rgba(192,57,43,.30)}
+    100%{box-shadow:0 0 0 3px var(--bad-soft)}
+  }
+  @keyframes iptShake{
+    0%,100%{transform:translateX(0)}
+    20%{transform:translateX(-4px)} 40%{transform:translateX(4px)}
+    60%{transform:translateX(-2px)} 80%{transform:translateX(2px)}
+  }
+  input[type=text].fxok{animation:iptOkPulse .5s ease-out 1}
+  input[type=text].fxbad{animation:iptBadPulse .5s ease-out 1, iptShake .26s ease-out 1}
+}
 .fb{margin-top:14px;border-radius:12px;padding:14px;font-size:15px;border:1px solid}
 .fb.ok{background:var(--ok-soft);border-color:#bfe3d3}
 .fb.bad{background:var(--bad-soft);border-color:#f3cdc7}
@@ -185,28 +236,37 @@ tr.hi td{background:var(--accent-soft);font-weight:700}
   .opts.three{grid-template-columns:1fr 1fr}
   .opts.persons .opt{padding:9px 5px;font-size:13.5px}
   .opts.persons .opt .pol{font-size:12.5px;line-height:1.3}
-  .opts.persons .opt .pol .w{display:none}
-  .opts.persons .opt .pol .s{display:inline}
   .pgrid .pcell{padding:4px 6px}
   .pgrid .pcell b{font-size:13.5px}
   .verb-big{font-size:28px}
   .wrap{padding:16px 13px 70px}
+  .ansrow{gap:7px}
+  .ansrow .subj{font-size:13.5px;padding:7px 9px}
 }
 kbd{background:#eef1f6;border-radius:5px;padding:1px 5px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace}
 /* 主页：变位规则速览入口 */
-.gcard .growbox{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
-/* 变位规则讲解页 */
-.gd h3{font-size:15px;margin:18px 0 6px;color:var(--ink)}
-.gd h3:first-child{margin-top:0}
-.gd p{margin:7px 0;font-size:14.5px;line-height:1.72}
-.gd ul{margin:7px 0 7px 18px;padding:0;font-size:14.5px;line-height:1.72}
-.gd li{margin:3px 0}
-.gd code,.gd .es{font-family:inherit;background:#f1f4f9;border-radius:5px;padding:1px 6px;font-size:13.5px}
+/* 变位规则讲解页
+   排版目标：页标题醒目、小节之间的分界一眼可见、正文行距舒服。
+   ⚠️ 注意：.gd 里**不要**给 .w-i/.w-o/.w-s 设 color（见下方长注释）。 */
+.gd p{margin:9px 0;font-size:15px;line-height:1.8}
+.gd ul{margin:10px 0 10px 20px;padding:0;font-size:15px;line-height:1.8}
+.gd li{margin:5px 0}
+.gd code,.gd .es{font-family:inherit;background:#f1f4f9;border-radius:6px;padding:1px 7px;font-size:13.5px}
 .gd .es{color:#334155}
-.gd table{margin:10px 0;font-size:14px}
-.gd th,.gd td{border-bottom:1px solid var(--line);padding:5px 8px}
+/* 小节标题：13.5px 灰字 + 左侧短色条，比正文只粗一点，但分界非常清楚。
+   用 background-image 画短色条（不是 border-left），所以色条只占标题那一行。 */
+.gd h3{
+  font-size:13.5px;font-weight:700;color:#475569;letter-spacing:1px;
+  margin:30px 0 13px;padding-left:10px;
+  background:linear-gradient(var(--accent),var(--accent)) left top/3px 100% no-repeat;
+}
+.gd h3:first-child{margin-top:4px}
+/* 小节内部再分段时用 h4：不加色条，只靠字重与字号区分 —— 层次不会乱 */
+.gd h4{font-size:14px;font-weight:700;color:#334155;margin:18px 0 8px}
+.gd table{margin:12px 0;font-size:14px}
+.gd th,.gd td{border-bottom:1px solid var(--line);padding:6px 9px}
 .gd tr.hi td{background:var(--accent-soft);font-weight:700}
-.gd .tip{border-left:3px solid var(--warn);background:var(--warn-soft);border-radius:0 10px 10px 0;padding:8px 12px;margin:10px 0;font-size:14px}
+.gd .tip{border-left:4px solid var(--warn);background:var(--warn-soft);border-radius:0 10px 10px 0;padding:10px 14px;margin:14px 0;font-size:14.5px;line-height:1.75}
 .gd .tip.ok{border-color:var(--ok);background:var(--ok-soft)}
 .gd .tip.warnx{border-color:var(--bad);background:var(--bad-soft)}
 /* 讲解页里的变位网格：正文里的 {{G:动词,动词|时态键}} 展开而成，
@@ -317,36 +377,19 @@ kbd{background:#eef1f6;border-radius:5px;padding:1px 5px;font-size:12px;font-fam
    右栏：变位表（查询模式，可拉开 / 收回的抽屉）
    抽屉一律以浮层出现，压在正文之上：开合只动抽屉本身，
    正文的宽度、位置、滚动条都不变（不会抖一下）。
+   ------------------------------------------------------------
+   入口（#dw-tab）不再做「贴右缘的常驻竖排拉手」：那个渐变胶囊一直
+   在闪（dwPulse 无限呼吸），又压在正文上，很辣眼睛。现在它只是开始
+   菜单里的一个普通按钮 —— 和「变位规则速览」的入口排在同一张卡片里，
+   练习页顶部原有的「变位表」按钮保持不动。
    ============================================================ */
 :root{--dw-w:480px}
 @media (max-width:1020px){:root{--dw-w:min(520px,94vw)}}
-/* 收起时的拉手：贴在右边缘中部，做成一眼就能看见的常驻按钮 */
-.dwtab{
-  position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:40;
-  display:flex;flex-direction:column;align-items:center;gap:9px;
-  border:0;border-radius:16px 0 0 16px;cursor:pointer;
-  background:linear-gradient(180deg,#5a92ff,var(--accent) 58%,#2050cd);
-  color:#fff;padding:16px 10px;
-  box-shadow:0 8px 26px rgba(47,109,246,.45);
-  animation:dwPulse 2.6s ease-in-out infinite;
+/* 开始菜单里的「变位表」入口：和旁边的「查看 →」按钮同款，只是一眼看得出是抽屉入口 */
+.btn.tblbtn{
+  font-weight:650;color:var(--accent);border-color:#c3d4fb;background:var(--accent-soft);gap:5px;
 }
-.dwtab .ico{font-size:17px;line-height:1}
-.dwtab .lb{writing-mode:vertical-rl;letter-spacing:4px;font-size:13.5px;font-weight:700;line-height:1.1}
-.dwtab:hover{padding-right:15px;background:linear-gradient(180deg,#6b9cff,#3c7bff 58%,#2a5fe0)}
-.dwtab:active{transform:translateY(-50%) scale(.98)}
-.dwtab:focus-visible{outline:3px solid #9dbcff;outline-offset:2px}
-@keyframes dwPulse{
-  0%,100%{box-shadow:0 8px 26px rgba(47,109,246,.45),0 0 0 0 rgba(47,109,246,.55)}
-  60%    {box-shadow:0 8px 26px rgba(47,109,246,.45),0 0 0 11px rgba(47,109,246,0)}
-}
-@media (prefers-reduced-motion:reduce){.dwtab{animation:none}}
-/* 正文开始铺满整个宽度的档位起，右边中部就容易压住文字，改挂到底部（也更好按） */
-@media (max-width:900px){
-  .dwtab{top:auto;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:none;padding:13px 10px}
-  .dwtab:active{transform:scale(.97)}
-}
-/* 抽屉打开时拉手让位给抽屉里的关闭按钮 */
-body.dw-open .dwtab{display:none}
+.btn.tblbtn:hover{background:#dce7fd;border-color:#a9c2f7}
 .dw-scrim{
   position:fixed;inset:0;background:rgba(18,26,48,.44);z-index:58;
   opacity:0;pointer-events:none;transition:opacity .2s;
@@ -356,14 +399,17 @@ body.dw-open .dw-scrim{opacity:1;pointer-events:auto}
   position:fixed;top:0;right:0;bottom:0;width:var(--dw-w);z-index:60;
   display:flex;flex-direction:column;background:var(--card);
   border-left:1px solid var(--line);box-shadow:-12px 0 36px rgba(16,24,40,.22);
-  transform:translateX(103%);transition:transform .22s ease;
+  transform:translateX(103%);transition:transform .22s cubic-bezier(.22,1,.36,1);
 }
-body.dw-open .drawer{transform:none}
+.drawer.on{transform:none}
 .dw-head{display:flex;align-items:center;gap:8px;padding:11px 12px 10px 14px;border-bottom:1px solid var(--line)}
 .dw-head .ttl{font-size:15px;font-weight:700}
 .dw-head .cnt{margin-left:auto;font-size:12px;color:var(--sub)}
 .dw-x{border:0;background:transparent;font-size:15px;line-height:1;color:var(--sub);padding:6px 9px;border-radius:9px}
 .dw-x:hover{background:#eceff4;color:var(--ink)}
+/* 设置栏与变位查询共用一套抽屉外壳，只是入口与内容不同 */
+#st .dw-head .ttl{display:flex;align-items:center;gap:7px}
+#st .dw-body{padding:2px 14px 26px}
 .dw-search{position:relative;padding:10px 12px 8px}
 #dw-q{font-size:15px;padding:9px 12px}
 .dw-sug{
@@ -434,20 +480,174 @@ select{font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--l
 .setpanel{margin-top:9px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:12px;padding:10px 12px 12px;background:#fbfcfe}
 .setpanel .sh{font-size:12.5px;font-weight:700;color:var(--ink)}
 .setpanel .hint{margin:8px 0 0}
-/* 主语提示紧挨在输入框左侧（只给西语代词，不再附中文 / 英语注解） */
+/* 主语提示紧挨在输入框左侧（只给西语代词，不再附中文 / 英语注解）。
+   多主语人称现在会整组列出（ellos / ellas / ustedes），窄屏上允许在斜杠处折行 ——
+   否则 nowrap 会把输入框挤没。 */
 .ansrow{display:flex;align-items:center;gap:9px}
-.ansrow .subj{flex:none;display:inline-flex;align-items:baseline;white-space:nowrap;font-size:15px}
+.ansrow .subj{flex:none;display:inline-flex;align-items:baseline;white-space:normal;
+  max-width:46%;overflow-wrap:anywhere;font-size:15px;line-height:1.3}
 .ansrow input[type=text]{flex:1;min-width:0}
+/* ============================================================
+   开始菜单：练习模式 + 6 个难度档 + 面板 + 常驻开始栏
+   ------------------------------------------------------------
+   第一行：练习模式（题型）—— 独立于下面任何一档。
+   第二行：4 个固定预设 + 2 个可以自己存的自定义槽，**3 列 × 2 行**。
+           点一档只是**选中**它（不直接开始答题）。
+   下面的面板显示「当前选中的那一档」的内容：
+           · 预设档 → 只读念一遍范围 + 一个「应用这套设置」；
+           · 自定义档 → 可编辑（词库 / 时态 / 其它），改动实时存进那个槽。
+   预设档只往面板里填东西，**绝不改「设置」栏里的全局项**（含 vosotros 等）。
+   ============================================================ */
+.keysbox{margin-top:16px;padding-top:13px;border-top:1px dashed var(--line)}
+.keys-h{font-size:15.5px;font-weight:800;color:var(--ink);letter-spacing:.2px;margin:0 0 9px;
+  padding-left:11px;background:linear-gradient(var(--accent),var(--accent)) left center/3px 72% no-repeat}
+/* 难度键：一行一个（横条）—— emoji + 名称/描述 +（自定义槽）右侧「编辑」 */
+.key-grid{display:grid;grid-template-columns:1fr;gap:8px}
+.key{
+  display:flex;align-items:center;gap:11px;text-align:left;border:1px solid var(--line);background:#fff;
+  border-radius:12px;padding:10px 13px;transition:.14s;min-width:0;cursor:pointer;
+}
+.key:hover{border-color:#bcd0fa;background:#f7faff;box-shadow:0 4px 12px rgba(16,24,40,.08)}
+.key:active{transform:none}
+.key .pic{flex:none;font-size:21px;line-height:1;transform:translateY(1px)}
+.key .kt{flex:1;min-width:0}
+.key .pn{display:block;font-size:14px;font-weight:700;letter-spacing:.2px;word-break:break-word}
+.key .pd{display:block;font-size:12px;color:var(--sub);line-height:1.5;margin-top:2px}
+/* 选中的键：左色条 + 淡蓝底（和练习模式 chip 的选中态同一套语言） */
+.key[aria-pressed="true"]{
+  border-color:#bcd0fa;background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent);
+}
+.key[aria-pressed="true"] .pn{color:#1f4fbb}
+/* 自定义槽用虚线边，一眼区分「这是你自己的、可以改」 */
+.key.mine{border-style:dashed}
+.key.mine[aria-pressed="true"]{border-style:solid}
+.key .key-edit{flex:none}
+/* 自定义编辑模态：居中卡片 + 遮罩（Esc / 点遮罩 / ✕ 都能关） */
+.cmodal{position:fixed;inset:0;z-index:80;display:none}
+.cmodal.on{display:block}
+.cmodal-mask{position:absolute;inset:0;background:rgba(18,26,48,.44)}
+.cmodal-box{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(756px,calc(100vw - 28px));max-height:min(86vh,900px);
+  display:flex;flex-direction:column;
+  background:#fff;border-radius:16px;padding:15px 17px 17px;
+  box-shadow:0 24px 60px rgba(15,23,42,.25);
+}
+/* 标题与底栏固定，只有中间的三节内容滚动 —— 「应用这套设置」永远伸手就够到 */
+.cmodal-body{flex:1;min-height:0;overflow:auto;margin:0 -4px;padding:0 4px}
+.cmodal-h{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px}
+.cmodal-h b{font-size:15.5px}
+/* 模态里的「其它」小节与内联面板共用 .pframe .sec 的间距约定 */
+.cmodal-f{display:flex;gap:9px;align-items:center;margin-top:14px;border-top:1px solid var(--line);padding-top:13px}
+/* 「修改成功」toast */
+#toast{
+  position:fixed;left:50%;bottom:36px;transform:translateX(-50%) translateY(10px);z-index:90;
+  background:#103c8f;color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;font-weight:600;
+  opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;box-shadow:0 8px 24px rgba(16,24,40,.28);
+}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+/* 键下方的面板：高度跟着内容走 */
+.pop{overflow:hidden;height:0;opacity:0;transition:height .2s ease,opacity .16s ease}
+.pop.on{opacity:1}
+.pop-in{padding-top:13px}
+/* 面板本体是一个带边框的「框」：一眼圈出「这里面改的东西只作用于这一档」 */
+.pframe{border:1px solid var(--line);border-radius:13px;background:#fff;padding:13px 15px 15px}
+/* 自定义槽：虚线框 + 淡底 —— 和自定义键的虚线边同一套语言（预设只读框是实线） */
+.pop.mine .pframe{border-style:dashed;background:#fbfdff}
+/* 面板里的小节标题：1 词库 / 2 时态 / 3 其它 —— 左侧短色条，和讲解页同一套标记语言 */
+.sec{margin:0 0 8px;font-size:12.5px;font-weight:700;color:#475569;letter-spacing:.8px;
+  padding-left:9px;background:linear-gradient(var(--accent),var(--accent)) left top/3px 100% no-repeat}
+.sec+.sec,.setrow+.sec{margin-top:20px}
+/* 三个小节之间拉开距离（词库 / 时态 / 其它）—— 内联面板与模态共用 */
+.pframe .sec{margin-top:20px}
+/* 时态小节的工具行：全选 / 清空靠左，计数顶到右边 */
+.pick-tools{display:flex;align-items:center;gap:8px;margin-top:10px}
+.pick-tools .meta{margin-left:auto}
+/* 练习模式的标题行：左标题、右设置入口（齿轮 + 设置） */
+.mode-h-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.mode-h-row .mode-h{margin:0}
+#m-set{display:inline-flex;align-items:center;gap:2px}
+/* 预设的只读说明 + 「应用这套设置」 */
+.preset-acts{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+.preset-hint{margin:9px 0 0;font-size:12.5px;color:var(--sub)}
+.preset-hint:empty{display:none}
+h2.cardhead.warn{color:var(--warn)}
+/* 常驻开始栏：菜单屏底部贴一条，按钮始终可点（正文照常滚动） */
+.startbar{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  position:sticky;bottom:0;z-index:20;
+  padding:10px 12px 12px;margin:2px 0 0;
+  background:linear-gradient(180deg,rgba(245,246,248,0),var(--bg) 42%);
+}
+.startbar .sb-txt{flex:1;min-width:0;font-size:13px;color:var(--sub)}
+.startbar #m-start{flex:none}
+/* ---- 练习模式：在 6 个难度档上面，题型独立于任何一档 ---- */
+.modebox{margin-top:2px}
+.mode-h{font-size:15.5px;font-weight:800;color:var(--ink);letter-spacing:.2px;margin:0 0 7px;
+  padding-left:11px;background:linear-gradient(var(--accent),var(--accent)) left center/3px 72% no-repeat}
+.mode-hint{margin:8px 0 0;font-size:12.5px;color:var(--sub)}
+/* ---- 右侧设置栏：标签 + 拨动开关（不再靠「点了变色」表达状态） ---- */
+.setrow{display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.setrow:last-child{border-bottom:0}
+.setrow .st{flex:1;min-width:0}
+.setrow .st b{display:block;font-size:14.5px;font-weight:650;line-height:1.4}
+.setrow .st small{display:block;font-size:12px;color:var(--sub);line-height:1.55;margin-top:3px}
+.setrow .sc{flex:none;padding-top:1px}
+.setrow .sc.wide{flex:none;width:100%;margin-top:7px;padding-top:0}
+.setrow.col{display:block}
+.sw{
+  position:relative;display:inline-block;width:44px;height:25px;border-radius:999px;
+  border:1px solid var(--line);background:#e6eaf2;cursor:pointer;padding:0;transition:.16s;
+}
+.sw::after{
+  content:"";position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.32);transition:.16s;
+}
+.sw[aria-pressed="true"]{background:var(--accent);border-color:var(--accent)}
+.sw[aria-pressed="true"]::after{left:21px}
+.sw:focus-visible{outline:3px solid #9dbcff;outline-offset:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#fff}
+.seg button{border:0;background:transparent;padding:7px 14px;font-size:13.5px;font-weight:600;color:var(--sub);transition:.14s}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.seg button:hover{background:#f2f5fa;color:var(--ink)}
+.seg button[aria-pressed="true"]:hover{background:var(--accent);color:#fff}
+.setfoot{margin:14px 0 4px;font-size:12.5px;color:var(--sub);line-height:1.6}
+/* ---- 变位规则速览：8 页入口排成整齐的两列 ---- */
+.growbox{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}
+.growbox .chip{
+  display:flex;align-items:center;justify-content:flex-start;text-align:left;
+  white-space:normal;line-height:1.45;padding:9px 13px;
+}
+.growbox .chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
 @media (max-width:560px){
-  .ansrow{gap:7px}
-  .ansrow .subj{font-size:13.5px;padding:7px 9px}
+  .growbox{grid-template-columns:1fr}
+}
+/* 讲解页底部的 8 页目录：和主页入口同一套两列网格。
+   它挂在正文卡外面，所以自己补回卡片的内边距，左边缘才和正文对齐。 */
+.gdgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:18px 16px 2px}
+.gdgrid .chip{display:flex;align-items:center;text-align:left;white-space:normal;line-height:1.45;padding:9px 13px}
+@media (max-width:560px){.gdgrid{grid-template-columns:1fr;margin-left:13px;margin-right:13px}}
+/* 讲解页的页标题比正文明显大一号（「每页的标题放大一些」） */
+#gd-body h2{font-size:22px;line-height:1.35;letter-spacing:.2px}
+/* 页标题前的章节序号做成小圆标，翻页时一眼知道翻到第几章 */
+.gd h2 .gnum, #gd-body h2 .gnum{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:26px;height:26px;margin-right:9px;border-radius:50%;
+  background:var(--accent);color:#fff;font-size:14px;font-weight:700;vertical-align:2px;
+}
+@media (max-width:560px){
+  .startbar{gap:8px;padding:9px 10px 11px}
+  .startbar .sb-txt{font-size:12px}
+  .startbar #m-start{width:100%}
 }
 </style>
 </head>
 <body id="app-body">
 <div class="wrap">
 
-<!-- 顶部：语言切换（中 / 英） -->
+<!-- 顶部：只有语言切换。设置入口搬到主页「练习模式」一行（#m-set 在下面的 modebox 里）
+     —— 这样一开练（离开主页）设置就再也打不开，题与判分口径不会被中途改动。 -->
 <div class="topbar">
   <div class="langsw" id="g-lang" role="group" aria-label="Language"></div>
 </div>
@@ -462,58 +662,57 @@ select{font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--l
     <button class="btn ghost" id="m-stats-btn"></button>
   </div>
 
-  <div class="card" style="margin-top:16px">
-    <h2 id="h-scope"></h2>
-    <div class="row" id="m-levels"></div>
-    <div class="row" id="m-tags" style="margin-top:8px"></div>
-    <p class="hint" id="m-level-hint" style="margin:8px 0 0"></p>
-    <p class="hint" id="m-lv-tense-hint" style="margin:4px 0 0;opacity:.85"></p>
-
-    <h2 class="h2row"><span id="h-mode"></span>
-      <button class="btn ghost sm setbtn" id="m-set" aria-expanded="false"></button></h2>
-    <div class="row" id="m-modes"></div>
-    <p class="hint" id="m-mode-rule" style="margin:8px 0 0"></p>
-    <div class="setpanel hidden" id="m-opt-panel">
-      <div class="sh" id="m-opt-sh"></div>
-      <div class="row" id="m-opts"></div>
-      <p class="hint" id="m-opt-hint" style="margin:8px 0 0"></p>
-    </div>
-
-    <h2 id="h-tense"></h2>
-    <div id="m-tenses"></div>
-    <div class="row" style="margin-top:10px">
-      <button class="btn ghost sm" id="m-t-all"></button>
-      <button class="btn ghost sm" id="m-t-none"></button>
-    </div>
-    <div class="row" id="m-t-recs" style="margin-top:8px"></div>
-    <div class="row" style="margin-top:6px">
-      <span class="meta" id="m-t-count"></span>
-    </div>
-  </div>
-
+  <!-- 一张卡管住「这次练什么」：
+       ① 练习模式（题型）—— 独立于下面任何一个键；
+       ② 六个难度档：4 个固定预设 + 2 个可以自己存的自定义槽；
+       ③ 键下面的面板：预设只读 + 「应用这套设置」；自定义可编辑并实时保存。
+       点键**不会**开始答题，开始永远只由底部那个按钮触发。 -->
   <div class="card">
-    <div class="spread">
-      <div>
-        <div class="meta" id="m-pool"></div>
+    <div class="modebox">
+      <div class="mode-h-row">
+        <div class="mode-h" id="h-mode"></div>
+        <!-- 设置入口：只在主页、挂在「练习模式」一行右侧（齿轮 + 设置）。
+             离开主页开始练习后没有这个按钮，设置抽屉也就无从打开。 -->
+        <button class="btn ghost sm" id="m-set" aria-controls="st" aria-expanded="false"></button>
       </div>
-      <button class="btn primary" id="m-start"></button>
+      <div class="row" id="m-modes"></div>
+      <p class="mode-hint" id="m-mode-rule"></p>
     </div>
-    <p class="hint" id="m-keys" style="margin:10px 0 0"></p>
+
+    <div class="keysbox">
+      <div class="keys-h" id="h-keys"></div>
+      <div class="key-grid" id="m-presets"></div>
+    </div>
+
+    <div class="pop" id="m-custom">
+      <div class="pop-in" id="m-pick-body"></div>
+    </div>
+    <!-- 点键 / 应用之后的一句话回执 -->
+    <p class="preset-hint" id="m-preset-warn" role="status" aria-live="polite"></p>
   </div>
+
+  <div class="startbar">
+    <div class="sb-txt" id="m-pool"></div>
+    <button class="btn primary" id="m-start"></button>
+  </div>
+  <p class="hint" id="m-keys" style="margin:0 0 12px"></p>
 
   <div class="card gcard">
     <div class="spread">
       <h2 style="margin:0" id="h-guide"></h2>
-      <button class="btn ghost" id="m-guide-open"></button>
+      <button class="btn ghost tblbtn" id="dw-tab" aria-controls="dw" aria-expanded="false"><span id="dw-tab-lb"></span></button>
     </div>
-    <p class="hint" id="m-guide-hint" style="margin:8px 0 0"></p>
     <div class="growbox" id="m-guide"></div>
   </div>
 
   <div class="footer" id="g-footer"></div>
 </section>
 
-<!-- ============================ 练习页 ============================ -->
+<!-- ============================ 练习页 ============================
+     这一屏刻意只留三样东西：退出 / 上一题 / 变位查询。
+     「设置」入口与「中文：开 / 关」都**不放这里**：它们会改变本次练习的参数，
+     而题干与选项是按出题那一刻算好的，中途改设置就会出现「模式和题不匹配」
+     （选项里没有正确答案、辨认模式里冒出输入框等）。要改设置请回主页。 -->
 <section id="scr-practice" class="hidden">
   <div class="nav">
     <div class="row tight">
@@ -523,10 +722,11 @@ select{font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--l
     <div class="row tight">
       <span class="meta" id="p-progress"></span>
       <button class="btn ghost" id="p-table"></button>
-      <button class="btn ghost" id="p-zh"></button>
     </div>
   </div>
   <div id="p-body"></div>
+  <!-- 判分结果只给读屏播报（面板整屏重绘，没有它读屏用户听不到对错） -->
+  <div class="sr-only live" id="p-live" role="status" aria-live="polite" aria-atomic="true"></div>
 </section>
 
 <!-- ============================ 统计页 ============================ -->
@@ -552,10 +752,18 @@ select{font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--l
 
 </div>
 
-<!-- ============================ 右栏：变位表（查询模式） ============================ -->
-<button type="button" class="dwtab" id="dw-tab" aria-controls="dw" aria-expanded="false">
-  <span class="ico" aria-hidden="true">▤</span><span class="lb" id="dw-tab-lb"></span>
-</button>
+<!-- ============================ 右栏：设置（选项开关） ============================
+     从页面顶部的「设置」按钮呼出；选项一律可用，不随练习模式置灰。 -->
+<aside class="drawer" id="st" aria-hidden="true">
+  <div class="dw-head">
+    <span class="ttl" id="st-ttl"></span>
+    <button type="button" class="dw-x" id="st-close" aria-label="close">✕</button>
+  </div>
+  <div class="dw-body" id="st-body"></div>
+</aside>
+
+<!-- ============================ 右栏：变位表（查询模式） ============================
+     入口在开始菜单里（#dw-tab，和「变位规则速览」同一张卡）；练习页顶部另有「变位表」按钮。 -->
 <div class="dw-scrim" id="dw-scrim"></div>
 <aside class="drawer" id="dw" aria-hidden="true">
   <div class="dw-head">
@@ -570,6 +778,26 @@ select{font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--l
   </div>
   <div class="dw-body" id="t-body"></div>
 </aside>
+
+<!-- ============================ 自定义难度编辑模态 ============================
+     点自定义槽键本身只「选中」这一套；点键右侧的「编辑」才弹出这个模态。
+     里面的编辑面板与当年内联面板是同一套渲染（renderPickPanel 画进 #cm-body），
+     「应用这套设置」= 关闭模态 + 「✅ 修改成功」提示（改动本来就是实时保存的）。 -->
+<div class="cmodal" id="cmodal" aria-hidden="true">
+  <div class="cmodal-mask" id="cm-mask"></div>
+  <div class="cmodal-box" role="dialog" aria-modal="true" aria-labelledby="cm-ttl">
+    <div class="cmodal-h">
+      <b id="cm-ttl"></b>
+      <button type="button" class="dw-x" id="cm-close" aria-label="close">✕</button>
+    </div>
+    <div class="cmodal-body" id="cm-body"></div>
+    <div class="cmodal-f">
+      <button type="button" class="btn primary" id="cm-apply"></button>
+      <button type="button" class="btn ghost sm" id="cm-reset"></button>
+    </div>
+  </div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script>
 /* ============================================================
@@ -626,6 +854,61 @@ const LV_TENSE = {
   B2: ALL_TENSE_KEYS.slice()
 };
 const TENSE_RECS = ['A1','A2','B1','B2'];
+/* ---------------- 难度档（六选一）----------------
+   4 个固定预设 + 2 个自定义槽。
+   每档 = 一套「这次练什么」：词库范围 + 时态 + 3 个出题开关。
+   **不含练习模式**（题型是上面单独一行，永远由用户自己选），
+   也**不碰「设置」栏里的全局项**（语言 / vosotros / 隐藏原形）。
+   预设只读（点「应用这套设置」才生效），自定义槽可改并实时保存。 */
+/* Lucide SVG 图标（24×24, stroke=currentColor, 2px），用于难度等级和自定义槽 */
+const ICO_SPROUT = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3"/><path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4"/><path d="M5 21h14"/></svg>';
+const ICO_TREE = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 19a4 4 0 0 1-2.24-7.32A3.5 3.5 0 0 1 9 6.03V6a3 3 0 1 1 6 0v.04a3.5 3.5 0 0 1 3.24 5.65A4 4 0 0 1 16 19Z"/><path d="M12 19v3"/></svg>';
+const ICO_ROCKET = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg>';
+const ICO_TROPHY = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"/><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2"/><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3"/></svg>';
+const ICO_WRENCH = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"/></svg>';
+const ICO_PUZZLE = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z"/></svg>';
+
+const PRESETS = [
+  {k:'starter', pic:ICO_SPROUT,
+   name:{zh:'零基础 · A1 起步', en:'Starter · A1'},
+   desc:{zh:'A1 词库 · 现在时 · 选择题', en:'A1 verbs · present · multiple choice'},
+   cfg:{levels:['A1'], tenses:['p'], tagFilter:'',
+        inputMode:'choice'}},
+  {k:'build', pic:ICO_TREE,
+   name:{zh:'入门 · A2 三时态', en:'Building · A2 three tenses'},
+   desc:{zh:'A1–A2 词库 · 现在 / 简单过去 / 未完成 · 手写', en:'A1–A2 verbs · present, preterite, imperfect · type it'},
+   cfg:{levels:['A1','A2'], tenses:['p','pr','i'], tagFilter:'',
+        inputMode:'type'}},
+  {k:'verbs', pic:ICO_ROCKET,
+   name:{zh:'进阶 · B1 八时态', en:'Advancing · B1 eight tenses'},
+   desc:{zh:'A2–B1 词库 · 8 个时态 · 手写', en:'A2–B1 verbs · 8 tenses · type it'},
+   cfg:{levels:['A2','B1'], tenses:LV_TENSE.B1, tagFilter:'',
+        inputMode:'type'}},
+  {k:'exam', pic:ICO_TROPHY,
+   name:{zh:'考试冲刺 · B2 全时态', en:'Exam sprint · B2'},
+   desc:{zh:'A1–B2 词库 · 全部 15 个时态 · 手写', en:'A1–B2 verbs · all 15 tenses · type it'},
+   cfg:{levels:['A1','A2','B1','B2'], tenses:ALL_TENSE_KEYS.slice(), tagFilter:'',
+        inputMode:'type'}},
+];
+const CUSTOM_KEYS = ['custom1','custom2'];
+const CUSTOM_PICS = [ICO_WRENCH, ICO_PUZZLE];
+/* 自定义槽的预填充：A2 词库 + 三个基础时态（避免有人没配置就开始练自定义） */
+function defaultCustom(){
+  return {levels:['A2'], tenses:['p','pr','i'], tagFilter:'', inputMode:'type'};
+}
+const ALL_KEYS = PRESETS.map(p => p.k).concat(CUSTOM_KEYS);
+const isCustomKey = k => CUSTOM_KEYS.indexOf(k) > -1;
+const presetOf = k => PRESETS.filter(p => p.k === k)[0] || null;
+/* 某个键的显示名（预设用表里的名字，自定义用「自定义 N」） */
+function keyName(k){
+  const p = presetOf(k);
+  if(p) return lang()==='en' ? p.name.en : p.name.zh;
+  const n = k === 'custom2' ? 2 : 1;
+  return tr('keyCustom', n);
+}
+/* 人称表。pro = 这个人称在语法上成立的全部主语代词 ——
+   辨认模式的选项、练习页的主语提示都用它整组显示（拉美的 ustedes 不会漏）；
+   gl / E 只作为母语释义放在选项下方的小字里。sl 是留给窄屏的短标签（目前未使用）。 */
 const PERSONS = [
   {l:'yo',                    sl:'yo',           S:'yo',                      pro:['yo'],                     gl:'我',            E:'I'},
   {l:'tú',                    sl:'tú',           S:'tú',                      pro:['tú'],                     gl:'你',            E:'you (informal)'},
@@ -664,24 +947,44 @@ function personPro(i, k){
   const p = PERSONS[i];
   return (p.pro && p.pro.length) ? p.pro : [p.S];
 }
+/* 「辨认是哪个人称」一律用**西语代词**作答：
+   yo / tú / él·ella·usted / nosotros·nosotras / vosotros·vosotras / ellos·ellas·ustedes。
+   理由：① 英语 you 既单数又复数，中文「你/您/你们」也不是一一对应；
+        ② 拉美的 ustedes 同时对应「你们」和「诸位」，摆出整组代词才不歧义；
+        ③ 选项本身就是要在西语里认出来的东西，不该绕一层母语。
+   多主语的人称（él / ella / usted）把一整组写出来，不再只显示其中一个。 */
+function personProSet(i, k){
+  /* 命令式没有 yo 这一格，但选项里仍要保留 yo 键（hable 这类同形形式
+     也可以读成虚拟式的 yo）—— 标签回退成 yo，不能留白 */
+  if(isImp(k)) return [IMP_LABEL[i] || 'yo'];
+  const p = PERSONS[i];
+  return (p.pro && p.pro.length) ? p.pro.slice() : [p.S];
+}
 /* 题目对应的时态键（转换模式问的是 tense2） */
 const qTense = q => (q.mode === 'shift' ? q.tense2 : q.tense);
 /* 四个练习模式。shift = 转换模式（同一动词换时态）；transfer = 平移模式（换一个动词） */
+/* icon = Lucide SVG（24×24, stroke=currentColor, 2px） */
 const MODES = [
   {k:'recognize', zh:'辨认模式', en:'Recognition',   d:'看一个变位形式，判断它是哪个人称',
-   ed:'See one conjugated form and tell which person it is'},
+   ed:'See one conjugated form and tell which person it is',
+   icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>'},
   {k:'produce',   zh:'复现模式', en:'Production',    d:'给出人称与时态，直接写出变位',
-   ed:'Given a person and a tense, write the form'},
+   ed:'Given a person and a tense, write the form',
+   icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>'},
   {k:'shift',     zh:'转换模式', en:'Tense shift',   d:'同一个动词：人称不变，只换一个时态',
-   ed:'Same verb and person — switch to another tense'},
+   ed:'Same verb and person — switch to another tense',
+   icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>'},
   {k:'transfer',  zh:'平移模式', en:'Verb transfer', d:'人称、时态都不变：照着 A 动词，写出 B 动词的变位',
-   ed:'Same person and tense — switch to another verb'},
+   ed:'Same person and tense — switch to another verb',
+   icon:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>'},
 ];
 const MODE_ZH = {}; MODES.forEach(m => MODE_ZH[m.k] = m.zh);
 const MODE_EN = {}; MODES.forEach(m => MODE_EN[m.k] = m.en);
 /* 「隐藏动词原形」只对这两个模式生效 */
 const INF_MODES = ['recognize','shift','transfer'];
 /* 出题人数：默认含 vosotros；关掉 setting.vosotros 后不再出第 6 人称（下标 4）的题 */
+/* 出题人数：默认含 vosotros；关掉 setting.vosotros 后不再出第 6 人称（下标 4）的题。
+   出题时按当前设置决定；选项生成用本题快照（见 buildOptions），保证同一题口径一致。 */
 const askedPersons = k => validPersons(k).filter(i => DB.settings.vosotros || i !== 4);
 /* 数据里的中文标签 → 英文 */
 const TAG_EN = {
@@ -698,52 +1001,52 @@ zh:{
   title:'西语动词变位练习器',
   sub: n => "Practicador de conjugaciones · 本地词库 <b>"+n+"</b> 个动词 · 支持 vosotros，不含 voseo",
   statsBtn:'📊 学习统计',
-  hScope:'1 · 词库范围 <span class="meta">（难度与标签同时生效，取交集）</span>',
-  lvRow:'按等级：',
-  tagRow:'按标签：',
-  levelHint: s => '当前可练：'+s,
+  custom:'自定义', quickStart:'快速开始', setDrawer:'设置',
+  editCustom:'编辑', editCustomTtl: n => '编辑「'+n+'」', savedOk:'修改成功',
+  presetCount: n => n+' 个动词',
+  hKeys:'难度 <span class="meta">（选一套练什么；自定义槽点「编辑」来改）</span>',
+  keyCustom: n => '自定义 '+n,
+  keyCustomInfo: (lv,nt,n) => lv+' 词库 · '+nt+' 个时态 · '+n+' 个动词',
+  keyEmpty: '还没设置：点这个键来配置',
+  secLib:'1 · 词库', secTense:'2 · 时态', secOther:'3 · 其它',
+  applyKey:'应用这套设置',
+  appliedKey: x => '已应用「'+x+'」。',
+  appliedCustom: x => '已切到「'+x+'」，改动会自动保存。',
+  presetOnly: (n,c) => '已应用「'+n+'」：'+c+' 个动词。点「开始练习」出题。',
+  presetNoTense:'这套设置没有可用时态，请换一套或自己配。',
+  presetNoPool:'这套设置的题库为空，请换一套或自己配。',
+  modeEnd: '练习模式已换，练习已结束 —— 点「开始练习」重新开始。',
+  applyReset:'恢复默认',
+  optAskTenseShort:'辨认模式同时问时态',
+  diagStem: x => '这一格是词干变化（不只是换词尾），正确形式是 '+x+'。',
+  diagOrth: x => '这一格是正字法拼写变化（为了保住读音才改拼写），正确形式是 '+x+'。',
+  diagIrr:  x => '这一格是不规则形式，需要单独记，正确形式是 '+x+'。',
+  /* 行首的「按等级：/ 按标签：」这类小标签全部去掉，行自己说话 */
   poolUnit:'个动词',
   levelN: n => '本级共 '+n+' 个动词',
-  hMode:'2 · 练习模式 <span class="meta">（单选）</span>',
-  setBtn:'⚙ 设置', setOpen:'⚙ 收起设置',
-  setTitle:'练习设置',
-  setScope: m => '当前模式：'+m+'。用不上的设置项会置灰。',
-  cfgLevels:'A1–B2 全开',
-  cfgLevels2:'A1–B2 全开',
-  cfgTenses:'A2–B2 · 全部时态',
-  cfgTenses2:'A2–B2 · 只练简单时态',
-  lvOff2:'x',
-  hTense:'3 · 时态 <span class="meta">（自由多选，15 个时态全部可选）</span>',
+  hMode:'练习模式',
   tAll:'全选', tNone:'清空', tRec:'推荐时态组：',
   tRecT: (lv,n) => '套用 '+lv+' 对应的 '+n+' 个时态',
   tCount: (n,tot) => '已选 <b>'+n+'</b> / '+tot+' 个时态',
   tCountNone:'<span style="color:var(--bad)">未选任何时态 —— 请至少选 1 个</span>',
-  tCountNa:'<span style="color:var(--sub)">本模式不按单个时态出题</span>',
-  tenseOff:'当前练习模式不会出这个时态（转换模式只练简单时态）',
   tenseXfer:'（平移模式借用它判断词形是否齐备）',
-  lvHint:'A1 现在时 / 过去分词 · A2 +简单过去时、未完成时 · B1 +将来时、条件式、现在完成时、过去完成时 · B2 全部 15 个时态',
-  optOff:'当前练习模式用不上这一项',
   tagAll:'全部动词', tagIrreg:'只练不规则', tagReg:'只练规则', tagFreq:'只练高频',
   tagSpell:'只练拼写变化', tagStem:'只练词干变化',
-  optShowZh:'显示中文意思', optShowZhT:'控制题干下的中文释义（写出变位的模式都受此开关影响）',
-  optShowEn:'显示中文意思', optShowEnT:'控制题干下的中文释义',
+  optShowZh:'显示中文释义', optShowZhT:'题干下面给一句中文意思',
   optHideInf:'隐藏动词原形',
-  optHideInfT:'只在辨认模式与转换模式生效：题干不再给出动词原形，需要先从这个变位形式认出动词；'
-             +'作答后会自动显示（中文释义另由「显示中文意思」单独控制）',
+  optHideInfT:'题干不再给出原形，要先从这个变位形式认出动词；作答后自动显示。'
+             +'复现模式必须看到原形，所以那一屏不受影响',
   optStrict:'严格要求重音', optStrictT:'关掉后「hablo / habló」这类只差重音的回答算对',
-  optAskTense:'辨认模式同时问时态', optAskTenseT:'辨认模式下除了人称，还要选出这个形式属于哪个时态',
-  optType:'答题方式', optTypeT:'点击切换手写 / 选择',
-  typeType:'答题方式：手写', typeChoice:'答题方式：选择',
-  optOnlyWrong:'只练我的错题', optOnlyWrongT:'题库只保留你做错过的动词（没有错题记录时不生效）',
-  optVosotros:'含 vosotros', optVosotrosT:'开启后题目里会包含第 6 人称（vosotros / vosotras）；关掉则完全不出该人称的题。该选项对全部练习模式有效。',
-  hideInfOff:'「隐藏动词原形」作用于辨认、转换、平移模式；复现模式必须看到原形，不受影响。',
-  hideInfOn:'原形已隐藏：题干不显示原形，作答后自动显示。',
-  hideInfOnNone:'原形已隐藏：<span style="color:var(--warn)">复现模式必须看到原形，'
-               +'这项设置当前不起作用</span>。',
-  hideInfZhWarn:'<span style="color:var(--warn)">中文释义仍会给出动词的含义，想彻底不认词，'
-               +'请一并关掉「显示中文意思」。</span>',
+  optAskTense:'辨认模式同时问时态', optAskTenseT:'除了人称，还要选出这个形式属于哪个时态',
+  infLabel:'原形', infPh:'写出这个动词的原形',
+  infWrong:(inf, given) => '原形不对：正确是 <b>'+inf+'</b>，你写的是 '+given+'。',
+  recInfHint:'不显示原形：从这个变位形式认出动词并写出它的原形；',
+  optType:'答题方式', optTypeT:'手写：自己敲出变位；选择：从四到六个形式里挑',
+  typeType:'手写', typeChoice:'选择',
+  optVosotros:'含 vosotros', optVosotrosT:'开启后题目里会包含第 6 人称（vosotros / vosotras）；关掉则完全不出该人称的题。',
+  setHint:'这一栏是全局项，对每一套设置都生效。',
   pool: (v,t) => '当前题库：<b>'+v+'</b> 个动词 / <b>'+t+'</b> 个时态',
-  poolWrong:'（只练错题）', poolNoTense:'当前题库：<span style="color:var(--bad)">还没有选择任何时态</span>',
+  poolNoTense:'当前题库：<span style="color:var(--bad)">还没有选择任何时态</span>',
   poolNoTenseNa:'当前题库：<span style="color:var(--bad)">本模式不按单个时态出题</span>',
   startNa:'换个模式吧',
   warnShift:'「转换模式」需要至少 2 个时态',
@@ -752,8 +1055,6 @@ zh:{
   start:'开始练习 →', startPick:'请先选择时态', startEmpty:'题库为空',
   keys:'快捷键：<kbd>1</kbd>–<kbd>6</kbd> 选人称，<kbd>Enter</kbd> 确认 / 下一题。',
   hGuide:'变位规则速览',
-  guideOpen:'查看 →',
-  guideHint:'8 页简明讲解：从一般现在时到四种过去时、命令式、将来式与虚拟式，再专门整理正字法、词干变化和重音书写。每页的变位例子都展开成与练习模式同款的六人称表。复杂语法点都附权威外链。',
   gdPrev:'← 上一页', gdNext:'下一页 →',
   gdCount:(i,n) => '第 '+i+' / '+n+' 页',
   gdLinks:'权威外链',
@@ -761,8 +1062,8 @@ zh:{
   lgIrr:'不规则', lgOrth:'正字法拼写变化', lgStem:'词干变化',
   lgNote:'着色只落在真正变了的那几个字母上（如 poder→pue-do 只标 ue、tocar→to-qué 只标 qu）。',
   tblAuth:'权威对照：', tblRae:'RAE 官方变位表',
-  relGrammar:'相关语法：', tblBtn: v => '看 '+v+' 的变位表',
-  dwTab:'变位表', dwPh:'输入原形 / 变位形式 / 释义…', dwCount: n => n+' 个动词',
+  relGrammar:'相关语法：', tblBtn: v => '看 '+v+' 的变位查询',
+  dwTab:'变位查询', dwPh:'输入原形 / 变位形式 / 释义…', dwCount: n => n+' 个动词',
   dwHint:'左栏简单、右栏复合；命令式分肯定 / 否定。随时可拉开、可收回。',
   affirm:'肯定', negative:'否定',
   tblGap:'「前过去时」（hube + 分词）现代西语已基本不用，故留空。',
@@ -771,10 +1072,9 @@ zh:{
   xferAlt:(f,ts,alts) => '说明：A 的 <b>'+f+'</b> 在「'+ts+'」里也读作同一个人称，所以 B 写成 '+alts+' 同样算对。',
   footer:"变位数据来源：Fred Jehle's Conjugated Spanish Verb Database（CC BY-NC-SA 3.0，600+ 动词）<br>"
         +"已剔除 voseo 专栏、修正源库个别重音错误；等级 / 中文释义为本程序自行标注。",
-  exit:'← 退出', prev:'上一题', navStats:'学习统计', navTable:'变位表查询', back:'← 返回',
+  exit:'← 退出', prev:'上一题', navStats:'学习统计', navTable:'变位查询', back:'← 返回',
   progress: (i,n,p) => i+' / '+n+' 题 · 正确 '+p+'%',
-  zhOn:'中文：开', zhOff:'中文：关', zhT:'显示 / 隐藏题干下的中文释义',
-  mz:{recognize:'辨认模式 · 这个变位形式的主语是哪个人称？',
+  mz:{recognize:'辨认模式 · 写出原形，判断它的主语人称（和时态）',
       produce:'复现模式 · 写出该人称的变位',
       shift:'转换模式 · 人称不变，换一个时态',
       transfer:'平移模式 · 人称、时态都不变，换成另一个动词'},
@@ -838,52 +1138,50 @@ en:{
   title:'Spanish Verb Conjugation Trainer',
   sub: n => "Practicador de conjugaciones · <b>"+n+"</b> verbs bundled · vosotros included, no voseo",
   statsBtn:'📊 Study stats',
-  hScope:'1 · Verb scope <span class="meta">(level and tag both apply — intersection)</span>',
-  lvRow:'By level:',
-  tagRow:'By tag:',
-  levelHint: s => 'Currently practising: '+s,
+  custom:'Customise', quickStart:'Quick start', setDrawer:'Settings',
+  editCustom:'Edit', editCustomTtl: n => 'Edit “'+n+'”', savedOk:'Saved',
+  presetCount: n => n+' verbs',
+  hKeys:'Difficulty <span class="meta">(pick one; edit custom slots with their Edit button)</span>',
+  keyCustom: n => 'Custom '+n,
+  keyCustomInfo: (lv,nt,n) => lv+' levels · '+nt+' tenses · '+n+' verbs',
+  keyEmpty:'Not set up yet — click this key to configure it',
+  secLib:'1 · Vocabulary', secTense:'2 · Tenses', secOther:'3 · Other',
+  applyReset:'Reset to defaults',
+  applyKey:'Apply this setup',
+  appliedKey: x => 'Applied “'+x+'”.',
+  appliedCustom: x => 'Switched to “'+x+'”; changes are saved automatically.',
+  presetOnly: (n,c) => 'Applied “'+n+'”: '+c+' verbs. Press Start to drill.',
+  presetNoTense:'This setup has no usable tense — pick another or build your own.',
+  presetNoPool:'This setup gives an empty pool — pick another or build your own.',
+  modeEnd: 'Practice mode changed — the session was closed. Press Start to begin again.',
+  diagStem: x => 'This slot has a stem change, not just a new ending — the correct form is '+x+'.',
+  diagOrth: x => 'This slot needs a spelling change (to keep the sound) — the correct form is '+x+'.',
+  diagIrr:  x => 'This slot is irregular and has to be memorised — the correct form is '+x+'.',
   poolUnit:'verbs',
   levelN: n => n+' verbs in this level',
-  hMode:'2 · Practice mode <span class="meta">(single choice)</span>',
-  setBtn:'⚙ Settings', setOpen:'⚙ Hide settings',
-  setTitle:'Practice settings',
-  setScope: m => 'Current mode: '+m+'. Options that do not apply are greyed out.',
-  cfgLevels:'A1–B2, all levels',
-  cfgLevels2:'A1–B2, all levels',
-  cfgTenses:'A2–B2, all tenses',
-  cfgTenses2:'A2–B2, simple tenses only',
-  lvOff2:'x',
-  hTense:'3 · Tenses <span class="meta">(free multi-select — all 15 tenses are available)</span>',
+  hMode:'Practice mode',
   tAll:'All', tNone:'None', tRec:'Tense sets:',
   tRecT: (lv,n) => 'Apply the '+n+' tenses for '+lv,
   tCount: (n,tot) => '<b>'+n+'</b> / '+tot+' tenses selected',
   tCountNone:'<span style="color:var(--bad)">No tense selected — pick at least one</span>',
-  tCountNa:'<span style="color:var(--sub)">This mode does not pick tenses</span>',
-  tenseOff:'This mode never uses this tense (tense shift practises simple tenses only)',
   tenseXfer:'(verb transfer borrows it to check the forms exist)',
-  lvHint:'A1 present / participle · A2 + preterite, imperfect · B1 + future, conditional, present perfect, pluperfect · B2 all 15 tenses',
-  optOff:'Not used by the current practice mode',
   tagAll:'All verbs', tagIrreg:'Irregular only', tagReg:'Regular only', tagFreq:'High-frequency only',
   tagSpell:'Spelling change only', tagStem:'Stem change only',
-  optShowZh:'Show meaning', optShowZhT:'Show or hide the meaning under the prompt',
-  optShowEn:'Show meaning', optShowEnT:'Show or hide the English meaning under the prompt',
+  optShowZh:'Show meaning', optShowZhT:'Show a short English meaning under the prompt',
   optHideInf:'Hide the infinitive',
-  optHideInfT:'Only affects recognition and tense-shift: the infinitive is hidden, '
-             +'so you must identify the verb from the conjugated form. It is revealed after you answer.',
+  optHideInfT:'The prompt no longer shows the infinitive, so you must identify the verb from the conjugated '
+             +'form; it is revealed after you answer. Production must show it, so that screen is unaffected.',
   optStrict:'Require exact accents', optStrictT:'Turn off to accept answers that only differ in accents',
   optAskTense:'Also ask the tense', optAskTenseT:'In recognition mode, also pick which tense the form belongs to',
-  optType:'Answer input', optTypeT:'Click to switch between typing and multiple choice',
-  typeType:'Answer input: type', typeChoice:'Answer input: choice',
-  optOnlyWrong:'Drill my mistakes only', optOnlyWrongT:'Keep only verbs you have got wrong (ignored if you have no mistakes yet)',
-  optVosotros:'Include vosotros', optVosotrosT:'On: questions may use the 6th person (vosotros / vosotras). Off: that person never appears. Applies to every practice mode.',
-  hideInfOff:'“Hide the infinitive” applies to recognition, tense shift and verb transfer; production must show it, so it is unaffected.',
-  hideInfOn:'Infinitive hidden: the prompt no longer shows it, and it comes back automatically after you answer.',
-  hideInfOnNone:'Infinitive hidden: <span style="color:var(--warn)">production must show the infinitive, '
-               +'so this setting does nothing right now</span>.',
-  hideInfZhWarn:'<span style="color:var(--warn)">The meaning still gives the verb away — turn off '
-               +'“Show meaning” as well if you want a real challenge.</span>',
+  infLabel:'Infinitive', infPh:'Write the verb’s infinitive',
+  infWrong:(inf, given) => 'Wrong infinitive: it should be <b>'+inf+'</b>, you wrote '+given+'.',
+  recInfHint:'The infinitive is hidden: tell which verb this is from the form;',
+  optType:'Answer input', optTypeT:'Type: write the form yourself; Choice: pick from four to six forms',
+  typeType:'Type', typeChoice:'Choice',
+  optVosotros:'Include vosotros', optVosotrosT:'On: questions may use the 6th person (vosotros / vosotras). Off: that person never appears.',
+  setHint:'These are global options — they apply to every setup key.',
   pool: (v,t) => 'Current pool: <b>'+v+'</b> verbs / <b>'+t+'</b> tenses',
-  poolWrong:' (mistakes only)', poolNoTense:'Current pool: <span style="color:var(--bad)">no tense selected yet</span>',
+  poolNoTense:'Current pool: <span style="color:var(--bad)">no tense selected yet</span>',
   poolNoTenseNa:'Current pool: <span style="color:var(--bad)">this mode does not pick tenses</span>',
   startNa:'Pick another mode',
   warnShift:'“Tense shift” needs at least 2 tenses',
@@ -892,8 +1190,6 @@ en:{
   start:'Start →', startPick:'Pick a tense first', startEmpty:'Pool is empty',
   keys:'Shortcuts: <kbd>1</kbd>–<kbd>6</kbd> pick a person, <kbd>Enter</kbd> submit / next.',
   hGuide:'Conjugation rules at a glance',
-  guideOpen:'Open →',
-  guideHint:'Eight short pages: the present, the four past tenses, the imperative, the future and the subjunctive, plus round-ups of spelling, stem changes and written accents. Every conjugation example is laid out as a full six-person table, exactly as the app shows a correct answer. Complex points come with authoritative links.',
   gdPrev:'← Previous', gdNext:'Next →',
   gdCount:(i,n) => 'Page '+i+' / '+n,
   gdLinks:'Authoritative sources',
@@ -901,8 +1197,8 @@ en:{
   lgIrr:'irregular', lgOrth:'spelling change', lgStem:'stem change',
   lgNote:'Only the letters that actually change are marked (poder → pue-do marks just ue; tocar → to-qué marks just qu).',
   tblAuth:'Official reference:', tblRae:'RAE conjugation table',
-  relGrammar:'Related grammar: ', tblBtn: v => 'See the '+v+' table',
-  dwTab:'Table', dwPh:'Infinitive, conjugated form or meaning…', dwCount: n => n+' verbs',
+  relGrammar:'Related grammar: ', tblBtn: v => 'Look up '+v,
+  dwTab:'Lookup', dwPh:'Infinitive, conjugated form or meaning…', dwCount: n => n+' verbs',
   dwHint:'Simple tenses on the left, compound on the right; the imperative shows affirmative vs. negative. Pull open or closed any time.',
   affirm:'affirmative', negative:'negative',
   tblGap:'The pretérito anterior (hube + participle) is no longer used in modern Spanish, so this slot stays blank.',
@@ -911,10 +1207,9 @@ en:{
   xferAlt:(f,ts,alts) => 'Note: A’s '+f+' also reads as the same person in the '+ts+', so writing '+alts+' for B counts as correct too.',
   footer:"Conjugation data: Fred Jehle's Conjugated Spanish Verb Database (CC BY-NC-SA 3.0, 600+ verbs).<br>"
         +"Voseo columns removed and a few accent errors in the source corrected; levels and meanings are our own.",
-  exit:'← Exit', prev:'Previous', navStats:'Study stats', navTable:'Conjugation table', back:'← Back',
+  exit:'← Exit', prev:'Previous', navStats:'Study stats', navTable:'Conjugation lookup', back:'← Back',
   progress: (i,n,p) => i+' / '+n+' · '+p+'% correct',
-  zhOn:'Meaning: on', zhOff:'Meaning: off', zhT:'Show / hide the meaning under the prompt',
-  mz:{recognize:'Recognition · which person is the subject of this form?',
+  mz:{recognize:'Recognition · write the infinitive and pick the subject person',
       produce:'Production · write the form for this person',
       shift:'Tense shift · same person, another tense',
       transfer:'Verb transfer · same person and tense, another verb'},
@@ -1006,6 +1301,20 @@ const norm = s => String(s).trim().toLowerCase().replace(/\s+/g,' ');
 const stripAcc = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ñ/g,'n');
 const rnd = n => Math.floor(Math.random()*n);
 const pick = a => a[rnd(a.length)];
+/* 微动效助手：加一次动画类，动画播完（或 700ms 兜底）就摘掉。
+   摘掉之后再调一次才会重播 —— 调用点都是「整屏重绘出来的新元素」或
+   「已选标记变化」，元素天生是干净的，所以不必强制回流（省一次重排）。
+   注意：动画本身写在 @media (prefers-reduced-motion:no-preference) 里，
+   尊重系统的「减少动态效果」；DOM 上多一个类名是无害的。 */
+const FX_ON = (typeof matchMedia === 'function')
+  && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+function once(el, cls, ms){
+  if(!el) return;
+  if(!FX_ON) return;
+  el.classList.remove(cls);
+  el.classList.add(cls);
+  setTimeout(()=>el.classList.remove(cls), ms || 700);
+}
 
 function forms(v, k){
   if(!v.t[k]) return null;
@@ -1115,6 +1424,16 @@ function siAlt(form){
   }
   return form;
 }
+/* 答错时给一句针对性的诊断（返回空串 = 这一形式没有可说的分类）。
+   数据里每个形式都带分类码 c：'.' 规则 / o 正字法拼写 / s 词干变化 / i 其他不规则。
+   只按码给一句定性的话，不去猜用户具体错在哪 —— 猜错了比不说更糟。 */
+function diagOf(q){
+  const v = VERBS[q.idx]; if(!v) return '';
+  const k = (q.mode === 'shift') ? q.tense2 : q.tense;
+  const code = (codesOf(v, k) || '')[q.person] || '.';
+  if(code === '.') return '';
+  return tr(code === 's' ? 'diagStem' : (code === 'o' ? 'diagOrth' : 'diagIrr'), q.answer);
+}
 /* 去掉用户答案中可能多写的代词、标点 */
 function cleanAnswer(s){
   let x = String(s).trim().replace(/[¡!¿?.,;]+$/g,'').replace(/^[¡¿]+/g,'');
@@ -1151,6 +1470,8 @@ function judge(user, correct, strict, tense){
 const LS = 'es_conj_app_v1';
 let DB = {
   settings: null,
+  custom: {custom1: null, custom2: null},
+  activeKey: null,   /* 刚打开时任何一个难度档都不选中，等用户自己点 */
   stats: { verbs:{}, tenses:{}, modes:{}, total:{att:0,err:0}, wrong:[] }
 };
 function loadDB(){
@@ -1182,7 +1503,7 @@ function defaultSettings(){
   return {
     levels: levelsInData().length ? levelsInData() : ['A1'], modes:['produce'],
     tenses: ALL_TENSE_KEYS.slice(),
-    showZh:true, strictAccent:true, inputMode:'type', onlyWrong:false, askTense:false,
+    showZh:true, strictAccent:true, inputMode:'type', askTense:false,
     tagFilter:'', hideInf:false, vosotros:true, lang:'zh'
   };
 }
@@ -1200,9 +1521,30 @@ function sanitizeSettings(){
   syncTenseOrder();
   if(typeof s.tagFilter !== 'string') s.tagFilter = '';
   s.inputMode = s.inputMode === 'choice' ? 'choice' : 'type';
-  s.hideInf = !!s.hideInf;        /* 辨认 / 转换 / 平移模式隐藏动词原形 */
-  s.vosotros = s.vosotros !== false;   /* 默认出 vosotros（第 6 人称）的题 */
+  s.hideInf = !!s.hideInf;             /* 辨认 / 转换 / 平移模式隐藏动词原形（全局项） */
+  s.vosotros = s.vosotros !== false;   /* 默认出 vosotros（第 6 人称）的题（全局项） */
   s.lang = s.lang === 'en' ? 'en' : 'zh';
+  /* 「只练我的错题」已下线（改成按错误率动态出题，以后再做）：老存档里的键清掉 */
+  delete s.onlyWrong;
+  /* 两个自定义槽：老存档没有就补空槽 */
+  const cust = (DB.custom && typeof DB.custom === 'object') ? DB.custom : {};
+  DB.custom = {};
+  CUSTOM_KEYS.forEach(k => {
+    const c = cust[k];
+    /* 槽永远是可用的：没有配置就用 A2 预填充（避免没配置就开始练自定义） */
+    DB.custom[k] = (c && typeof c === 'object' && Array.isArray(c.levels)) ? c : defaultCustom();
+  });
+  /* activeKey 允许是 null（刚打开、还没选任何难度档）；
+     只有存了一个非法值时才回退猜一个 */
+  if(DB.activeKey !== null && ALL_KEYS.indexOf(DB.activeKey) < 0) DB.activeKey = activeKeyFromSettings();
+}
+/* 老存档没有 activeKey 时，猜一个：正好等于某个预设就选它，否则选第一个空的自定义槽 */
+function activeKeyFromSettings(){
+  const hit = PRESETS.filter(p => sameSet(DB.settings.levels, p.cfg.levels)
+                              && sameSet(DB.settings.tenses, p.cfg.tenses)
+                              && (DB.settings.tagFilter || '') === (p.cfg.tagFilter || ''))[0];
+  if(hit) return hit.k;
+  return CUSTOM_KEYS.filter(k => !DB.custom || !DB.custom[k])[0] || CUSTOM_KEYS[0];
 }
 function recordAnswer(q){
   const st = DB.stats;
@@ -1230,15 +1572,19 @@ function recordAnswer(q){
 /* 静态文案：随语言切换重刷（标题、小节名、按钮等） */
 function applyStatic(){
   if(document.documentElement) document.documentElement.lang = tr('htmlLang');
+  /* q.diag 是一整句已渲染好的中文 / 英文诊断，换语言就过期；
+     下次 renderPractice() 会按新语言重新算（applyStatic 总是先于重绘被调用） */
+  SESS.history.forEach(q => { if(q) q.diag = ''; });
   $('g-title').textContent = tr('title');
   $('g-sub').innerHTML = tr('sub', VERBS.length);
   $('m-stats-btn').textContent = tr('statsBtn');
-  $('h-scope').innerHTML = tr('hScope');
+  $('m-set').innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>' + esc(tr('setDrawer'));
   $('h-mode').innerHTML = tr('hMode');
-  $('h-tense').innerHTML = tr('hTense');
-  $('m-t-all').textContent = tr('tAll');
-  $('m-t-none').textContent = tr('tNone');
-  $('m-opt-sh').textContent = tr('setTitle');
+  $('h-keys').innerHTML = tr('hKeys');
+  /* 这三个只存在于「自定义」面板里，预设键的面板上没有 → 必须先判存在 */
+  const tAll = $('m-t-all'), tNone = $('m-t-none');
+  if(tAll)  tAll.textContent  = tr('tAll');
+  if(tNone) tNone.textContent = tr('tNone');
   $('m-keys').innerHTML = tr('keys');
   renderGuideHome();
   $('g-footer').innerHTML = tr('footer');
@@ -1246,15 +1592,16 @@ function applyStatic(){
   $('p-prev').textContent = tr('prev');
   $('p-table').textContent = tr('dwTab');
   $('p-table').title = tr('dwHint');
-  $('p-zh').title = tr('zhT');
   $('s-back').textContent = tr('back');
   $('s-nav').textContent = tr('navStats');
-  /* 右栏变位表 */
+  /* 右栏：变位查询 */
   $('dw-ttl').textContent = tr('navTable');
   $('dw-tab-lb').textContent = tr('dwTab');
   $('dw-tab').title = tr('dwHint');
   $('dw-q').setAttribute('placeholder', tr('dwPh'));
   $('dw-q').setAttribute('aria-label', tr('navTable'));
+  /* 右栏：设置（内容全由 renderSettings 生成，这里只换标题） */
+  $('st-ttl').textContent = tr('setDrawer');
   renderLangSw();
 }
 /* 顶部语言切换按钮 */
@@ -1279,9 +1626,12 @@ function rerender(){
   if(!$('scr-stats').classList.contains('hidden'))    renderStats();
   if(!$('scr-guide').classList.contains('hidden'))    renderGuide();
   if(DW_OPEN) renderTable();          /* 右栏开着时一并跟着换语言 */
+  if(ST_OPEN) renderSettings();       /* 设置栏开着时一并跟着换语言 */
 }
-/* 设置抽屉是否展开（默认收起；展开状态在重绘之间保持） */
-let SET_OPEN = false;
+/* 「自定义」是否展开（收起时词库 / 标签 / 时态都不画出来）与高度动画的定时器 */
+let CUSTOM_T = null;
+/* 设置栏是否展开 */
+let ST_OPEN = false;
 /* 每个练习模式允许的「难度级别」范围。时态一律不限制：
    平移模式虽然不按单个时态抽题，但它借用所选时态来判断「B 动词在这个人称时态下有没有形式」，
    所以它的时态必须可选，不能锁死。 */
@@ -1300,31 +1650,320 @@ function clampScope(mode){
   s.levels = (s.levels||[]).filter(lv => valid.includes(lv));
   if(!s.levels.length) s.levels = [valid[0]];
 }
-/* 设置项跟着已选模式走：用不上的项不消失，直接置灰不可点 */
-function optUsable(k, mode){
-  switch(k){
-    /* 辨认模式是「选人称」，不需要手写，也不判重音 */
-    case 'strictAccent': return mode !== 'recognize';
-    case 'type':         return mode !== 'recognize';
-    /* 「同时问时态」只有辨认模式用得上 */
-    case 'askTense':     return mode === 'recognize';
-    /* 复现模式必须看到原形，「隐藏原形」只对辨认 / 转换 / 平移生效 */
-    case 'hideInf':      return mode !== 'produce';
-    default:             return true;
+/* ============================================================
+   一键预设（开始菜单最上面那四个按钮）
+   ============================================================ */
+/* 两个数组「元素相同、顺序也一致」——等级与时态在设置里都按固定顺序存 */
+function sameSet(a, b){
+  if(!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  return a.every((x, i) => x === b[i]);
+}
+function loadKey(k){
+  const p = presetOf(k);
+  if(!p) return;                       /* 自定义槽的「载入」由 renderMenu 负责 */
+  /* 只搬「这次练什么」这三样：词库范围 + 时态 + 3 个出题开关。
+     练习模式、以及设置栏里的全局项（语言 / vosotros / 隐藏原形）**一律不动**。 */
+  DB.settings.levels = p.cfg.levels.slice();
+  DB.settings.tenses = p.cfg.tenses.slice();
+  DB.settings.tagFilter = p.cfg.tagFilter || '';
+  DB.settings.inputMode = p.cfg.inputMode === 'choice' ? 'choice' : 'type';
+}
+/* 选中一个自定义槽：把它保存的那套设置载回 DB.settings（空槽不动，等用户来配）。
+   有了这一步，点预设载入预设、点自定义载回自定义 —— 两边互不覆盖：
+   预设只写 DB.settings，自定义槽的配置一直待在 DB.custom[k] 里随时载回。 */
+function loadCustom(k){
+  const c = DB.custom && DB.custom[k];
+  if(!c || !Array.isArray(c.levels)) return;
+  DB.settings.levels = c.levels.slice();
+  DB.settings.tenses = c.tenses.slice();
+  DB.settings.tagFilter = c.tagFilter || '';
+  DB.settings.inputMode = c.inputMode === 'choice' ? 'choice' : 'type';
+}
+/* 选中一个难度档：先（预设）载入它的设置，再展开它下面的面板、重画键与面板，并保存 */
+/* ============ 自定义槽的编辑模态 ============
+   点键本身只「选中」这套设置；点键右侧的「编辑」才打开模态。
+   编辑内容 = 原来的三个小节（renderPickPanel 画进 #cm-body），
+   改动实时存进槽；「应用这套设置」= 关闭模态 + 「✅ 修改成功」。 */
+let CM_OPEN = false, CM_KEY = null;
+function openCustomModal(k){
+  if(!isCustomKey(k)) return;
+  CM_KEY = k; CM_OPEN = true;
+  DB.activeKey = k;
+  loadCustom(k);            /* 把这个槽保存的配置载回 DB.settings，控件才有得改 */
+  saveDB();
+  const pop = $('m-custom'); if(pop) pop.classList.remove('on');
+  renderMenu();             /* renderPickPanel 会把编辑面板画进 #cm-body */
+  $('cm-ttl').textContent = tr('editCustomTtl', keyName(k));
+  $('cm-apply').textContent = tr('applyKey');
+  $('cm-reset').textContent = tr('applyReset');
+  const m = $('cmodal');
+  m.classList.add('on');
+  m.setAttribute('aria-hidden', 'false');
+}
+function closeCustomModal(){
+  CM_OPEN = false; CM_KEY = null;
+  const m = $('cmodal');
+  m.classList.remove('on');
+  m.setAttribute('aria-hidden', 'true');
+  $('cm-body').innerHTML = '';
+  renderMenu();             /* 清掉内联残留、刷新键上的摘要与开始栏 */
+}
+/* 「✅ 修改成功」这类一闪而过的提示 */
+let toastTimer = null;
+function showToast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('on'), 2200);
+}
+function selectKey(k){
+  if(ALL_KEYS.indexOf(k) < 0) return;
+  DB.activeKey = k;
+  const p = presetOf(k);
+  if(p) loadKey(k); else loadCustom(k);
+  /* 选中预设 → 展开只读面板；选中自定义槽 → 也展开只读摘要面板（编辑走模态） */
+  const pop = $('m-custom');
+  if(pop) pop.classList.toggle('on', !!k);
+  saveDB();
+  renderMenu();
+  const warn = $('m-preset-warn');
+  if(warn){
+    const pool = buildPool();
+    if(!DB.settings.tenses.length) warn.textContent = tr('presetNoTense');
+    else if(!pool.length)          warn.textContent = tr('presetNoPool');
+    else if(p)                     warn.textContent = tr('presetOnly', keyName(k), pool.length);
+    else                           warn.textContent = tr('appliedCustom', keyName(k));
   }
 }
-function renderMenu(){
+/* 这一档是不是几套「预设」之一？（给只读面板里的说明用） */
+function presetMatches(p){
+  const c = p.cfg;
+  return sameSet(DB.settings.levels, c.levels) && sameSet(DB.settings.tenses, c.tenses)
+      && (DB.settings.tagFilter || '') === (c.tagFilter || '')
+      && DB.settings.inputMode === c.inputMode;
+}
+/* 六选一：**只有当前选中的那一档是亮的**（互斥）。
+   早期版本让「当前设置正好等于某个预设」也亮，于是点了「自定义」之后
+   零基础那一档还亮着，看起来像没点动 —— 现在改为只认 DB.activeKey。 */
+function renderPresets(){
+  const box = $('m-presets'); if(!box) return;
+  box.innerHTML = '';
+  PRESETS.forEach(p => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'key';
+    b.dataset.preset = p.k;
+    b.setAttribute('aria-pressed', DB.activeKey === p.k ? 'true' : 'false');
+    const n = VERBS.filter(v => p.cfg.levels.includes(v.l))
+                  .filter(v => !p.cfg.tagFilter || tagMatch(v, p.cfg.tagFilter)).length;
+    b.innerHTML = '<span class="pic" aria-hidden="true">'+p.pic+'</span>'
+      + '<span class="kt"><span class="pn">' + esc(lang()==='en' ? p.name.en : p.name.zh) + '</span>'
+      + '<span class="pd">' + esc(lang()==='en' ? p.desc.en : p.desc.zh)
+      + ' · ' + tr('presetCount', n) + '</span></span>';
+    b.title = tr('presetOnly', lang()==='en' ? p.name.en : p.name.zh, n);
+    b.onclick = () => selectKey(p.k);
+    box.appendChild(b);
+  });
+  CUSTOM_KEYS.forEach((k, i) => {
+    const saved = DB.custom && DB.custom[k];
+    /* 自定义槽是一个 div（里面还要嵌「编辑」按钮，button 里不能再套 button） */
+    const b = document.createElement('div');
+    b.className = 'key mine';
+    b.dataset.custom = k;
+    b.setAttribute('role', 'button');
+    b.setAttribute('tabindex', '0');
+    b.setAttribute('aria-pressed', DB.activeKey === k ? 'true' : 'false');
+    /* 键上直接报这套设置的内容：xx 词库 · x 个时态 · N 个动词 */
+    let desc;
+    if(saved){
+      const nv = VERBS.filter(v => saved.levels.includes(v.l))
+                      .filter(v => !saved.tagFilter || tagMatch(v, saved.tagFilter)).length;
+      desc = tr('keyCustomInfo', saved.levels.join('+'), saved.tenses.length, nv);
+    } else desc = tr('keyEmpty');
+    b.innerHTML = '<span class="pic" aria-hidden="true">'+CUSTOM_PICS[i]+'</span>'
+      + '<span class="kt"><span class="pn">' + esc(tr('keyCustom', i+1)) + '</span>'
+      + '<span class="pd">' + esc(desc) + '</span></span>'
+      + '<button type="button" class="btn ghost sm key-edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg> '
+      + esc(tr('editCustom')) + '</button>';
+    b.onclick = () => selectKey(k);
+    const eb = b.querySelector && b.querySelector('.key-edit');
+    if(eb) eb.onclick = e => { e.stopPropagation(); openCustomModal(k); };
+    b.onkeydown = e => {
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); selectKey(k); }
+    };
+    box.appendChild(b);
+  });
+  /* 面板高度跟着内容走（点不同键时面板内容会变高变矮） */
+  const pop = $('m-custom');
+  if(pop){
+    const on = pop.classList.contains('on');
+    pop.style.height = 'auto';
+    if(on){ pop.style.height = pop.scrollHeight + 'px'; }
+    else  { pop.style.height = '0px'; }
+  }
+}
+/* 键下面的面板：
+   · 预设键 → 只读地把这套设置念一遍（点预设键本身就已生效，没有多余按钮）
+   · 自定义槽 → 可编辑的三个小节（1 词库 / 2 时态 / 3 其它），改动实时存进那个槽，
+     底部挂「应用这套设置」（回执）与「恢复默认」
+   面板里的控件由 renderMenu() 填充；这里只画外壳与只读说明。 */
+function renderPickPanel(){
+  const inline = $('m-pick-body'); if(!inline) return;
+  const k = DB.activeKey, p = presetOf(k);
+  /* 自定义槽的编辑面板住在模态里（#cm-body）；模态没开时内联面板一律空着 */
+  const box = (!p && CM_OPEN) ? $('cm-body') : inline;
+  if(!k){
+    inline.innerHTML = '';
+    $('cm-body').innerHTML = '';
+    const pop0 = $('m-custom');
+    if(pop0) pop0.classList.remove('mine', 'on');
+    return;
+  }
+  if(!p && CM_OPEN){
+    /* 模态已开：渲染可编辑面板（和以前一样） */
+    const pop = $('m-custom');
+    if(pop) pop.classList.toggle('mine', true);
+    const i = k === 'custom2' ? 2 : 1;
+    box.innerHTML =
+        '<div class="pframe">'
+      + '<div class="preset-acts"><b id="m-pick-ttl">'+esc(tr('keyCustom', i))+'</b></div>'
+      + '<div class="sec">'+esc(tr('secLib'))+'</div>'
+      + '<div class="row" id="m-levels"></div>'
+      + '<div class="row" id="m-tags" style="margin-top:8px"></div>'
+      + '<div class="sec">'+esc(tr('secTense'))+'</div>'
+      + '<div class="row" id="m-t-recs"></div>'
+      + '<div id="m-tenses" style="margin-top:10px"></div>'
+      + '<div class="pick-tools">'
+      +   '<button class="btn ghost sm" id="m-t-all"></button>'
+      +   '<button class="btn ghost sm" id="m-t-none"></button>'
+      +   '<span class="meta" id="m-t-count"></span>'
+      + '</div>'
+      + '<p class="hint" id="m-level-hint" style="margin:10px 0 0"></p>'
+      + '<div class="sec">'+esc(tr('secOther'))+'</div>'
+      + '<div id="m-opt-chips"></div>'
+      + '</div>'
+      + '</div>';
+    const a1 = $('m-t-all'), a0 = $('m-t-none');
+    if(a1) a1.onclick = ()=>{ DB.settings.tenses = ALL_TENSE_KEYS.slice(); syncTenseOrder(); syncActiveCustom(); saveDB(); renderMenu(); };
+    if(a0) a0.onclick = ()=>{ DB.settings.tenses = []; syncActiveCustom(); saveDB(); renderMenu(); };
+    return;
+  }
+  const pop = $('m-custom');
+  if(pop) pop.classList.toggle('mine', !p);
+  if(!p){
+    /* 自定义槽，模态未开 → 显示只读摘要（和预设一样的格式） */
+    const saved = DB.custom && DB.custom[k];
+    const i = k === 'custom2' ? 2 : 1;
+    const line = (a, b) => '<div class="hint" style="margin:3px 0">· <b>'+esc(a)+'</b> '+esc(b)+'</div>';
+    let h = '<div class="pframe"><div class="preset-acts"><b id="m-pick-ttl">'
+          + esc(tr('keyCustom', i)) + '</b></div>';
+    if(saved){
+      const nv = VERBS.filter(v => saved.levels.includes(v.l))
+                      .filter(v => !saved.tagFilter || tagMatch(v, saved.tagFilter)).length;
+      h += '<div style="margin-top:6px">'
+         + line(tr('secLib'), saved.levels.join(' + ') + ' · ' + tr('presetCount', nv))
+         + line(tr('secTense'), saved.tenses.map(x => tName(x)).join(' / '))
+         + line(tr('secOther'),
+                [saved.inputMode === 'choice' ? tr('typeChoice') : tr('typeType')].join(' · '))
+         + '</div>';
+    } else {
+      h += '<div style="margin-top:6px"><div class="hint">' + esc(tr('keyEmpty')) + '</div></div>';
+    }
+    h += '</div>';
+    box.innerHTML = h;
+    return;
+  }
+  const c = p.cfg;
+  const n = VERBS.filter(v => c.levels.includes(v.l))
+                .filter(v => !c.tagFilter || tagMatch(v, c.tagFilter)).length;
+  /* 把「这套设置到底包含什么」逐条念出来，中英各一套说法。
+     预设面板只读、不带「应用这套设置」—— 点预设键本身就已立即生效。 */
+  const line = (a, b) => '<div class="hint" style="margin:3px 0">· <b>'+esc(a)+'</b> '+esc(b)+'</div>';
+  let h = '<div class="pframe"><div class="preset-acts"><b id="m-pick-ttl">'
+        + esc(lang()==='en' ? p.name.en : p.name.zh) + '</b></div>';
+  h += '<div style="margin-top:6px">'
+     + line(tr('secLib'), c.levels.join(' + ') + ' · ' + tr('presetCount', n))
+     + line(tr('secTense'), c.tenses.map(x => tName(x)).join(' / '))
+     + line(tr('secOther'),
+            [c.inputMode === 'choice' ? tr('typeChoice') : tr('typeType')].join(' · '))
+     + '</div></div>';
+  box.innerHTML = h;
+}
+/* 把当前「这套设置」存回正在编辑的自定义槽。
+   如果当前选中的是一个**只读预设**，用户一动手就说明他想改：
+   这时自动把这套设置收进一个自定义槽（优先空的，否则槽 1），
+   于是「预设不会被编辑污染」与「改动不会丢」两件事同时成立。 */
+function ensureCustomTarget(){
+  if(isCustomKey(DB.activeKey)) return DB.activeKey;
+  const free = CUSTOM_KEYS.filter(k => !DB.custom[k])[0];
+  DB.activeKey = free || CUSTOM_KEYS[0];
+  renderPresets();
+  renderPickPanel();
+  if(!presetOf(DB.activeKey)) repaintPick();
+  return DB.activeKey;
+}
+function syncActiveCustom(){
+  const k = ensureCustomTarget();
+  DB.custom[k] = {
+    levels: DB.settings.levels.slice(),
+    tenses: DB.settings.tenses.slice(),
+    tagFilter: DB.settings.tagFilter || '',
+    inputMode: DB.settings.inputMode
+  };
+}
+/* 开始练习：开始菜单的按钮、预设、以及以后任何入口都走这里 */
+function startPractice(){
+  SESS = {history:[], cur:-1, right:0, done:0, recent:[]};
+  const q = makeQuestion();
+  if(!q){ alert(tr('emptyPoolAlert')); return false; }
+  closeSettings();   /* 设置入口只在主页：开练即收起，练习期间打不开（也没有入口） */
+  SESS.history.push(q); SESS.cur = 0;
+  show('scr-practice'); renderPractice();
+  return true;
+}
+/* ============================================================
+   右侧设置栏：**只放全局项**
+   ------------------------------------------------------------
+   全局项 = 不随「哪一套设置」变化的东西：隐藏动词原形、含 vosotros。
+   「显示中文释义 / 严格要求重音 / 辨认模式同时问时态 / 答题方式」都已搬到
+   难度档的自定义面板里（它们是那一套设置的一部分）。
+   预设键**永远不碰**这一栏，所以这里两项也不会被预设改掉。
+   ============================================================ */
+function renderSettings(){
+  const body = $('st-body'); if(!body) return;
   const s = DB.settings;
-  syncTenseOrder();
-  applyStatic();
-  // ---- 1 · 词库范围：等级（多选）+ 标签（单选）取交集 ----
-  const lvBox = $('m-levels'); lvBox.innerHTML = '';
-  const lvLbl = document.createElement('span');
-  lvLbl.className = 'meta'; lvLbl.textContent = tr('lvRow');
-  lvBox.appendChild(lvLbl);
+  const rows = [
+    {k:'hideInf',  on:!!s.hideInf,  label:tr('optHideInf'),  hint:tr('optHideInfT')},
+    {k:'vosotros', on:!!s.vosotros, label:tr('optVosotros'), hint:tr('optVosotrosT')},
+    {k:'showZh',   on:!!s.showZh,   label:tr('optShowZh'),   hint:tr('optShowZhT')},
+    {k:'strictAccent', on:!!s.strictAccent, label:tr('optStrict'), hint:tr('optStrictT')},
+  ];
+  let h = '';
+  rows.forEach(r=>{
+    h += '<div class="setrow"><div class="st"><b>'+esc(r.label)+'</b>'
+       + '<small>'+esc(r.hint)+'</small></div>'
+       + '<div class="sc"><button type="button" class="sw" data-opt="'+r.k+'" role="switch"'
+       + ' aria-checked="'+(r.on?'true':'false')+'" aria-pressed="'+(r.on?'true':'false')+'"'
+       + ' aria-label="'+esc(r.label)+'"></button></div></div>';
+  });
+  h += '<p class="setfoot">'+esc(tr('setHint'))+'</p>';
+  body.innerHTML = h;
+  body.querySelectorAll('.sw').forEach(b=>{
+    b.onclick = ()=>{ DB.settings[b.dataset.opt] = !DB.settings[b.dataset.opt]; saveDB(); renderSettings(); refreshAfterSetting(); };
+  });
+}
+/* 改了设置之后，把当前那一屏跟着刷新（在练习页就重绘本题的作答区） */
+function refreshAfterSetting(){
+  if(!$('scr-menu').classList.contains('hidden')) renderMenu();
+  else if(!$('scr-practice').classList.contains('hidden')) renderPractice();
+}
+/* 面板里的「等级」行：该等级没有动词、又没被选中时不画空按钮 */
+function mkLevelChips(host){
+  const s = DB.settings;
+  host.innerHTML = '';
   LEVELS.forEach(lv=>{
     const n = VERBS.filter(v=>v.l===lv).length;
-    /* 该等级没有动词、又没被选中时就不画这个按钮，免得出现两个永远灰着的空档 */
     if(!n && !s.levels.includes(lv)) return;
     const b = document.createElement('button');
     b.className='chip'; b.dataset.lv = lv;
@@ -1334,104 +1973,52 @@ function renderMenu(){
     b.onclick = ()=>{
       const i = s.levels.indexOf(lv);
       if(i>-1){ if(s.levels.length>1) s.levels.splice(i,1); } else s.levels.push(lv);
-      saveDB(); renderMenu();
+      syncActiveCustom(); saveDB(); repaintPick();
     };
-    lvBox.appendChild(b);
+    host.appendChild(b);
   });
-
-  const tagBox = $('m-tags'); tagBox.innerHTML='';
-  const tagLbl = document.createElement('span');
-  tagLbl.className = 'meta'; tagLbl.textContent = tr('tagRow');
-  tagBox.appendChild(tagLbl);
-  const tagOpts = [
+}
+/* 面板里的「标签」行：单选，再点一次回到「全部动词」 */
+function mkTagChips(host){
+  const s = DB.settings;
+  host.innerHTML = '';
+  [
     {k:'',        lbl:()=>tr('tagAll')},
     {k:'不规则',   lbl:()=>tr('tagIrreg')},
     {k:'规则',    lbl:()=>tr('tagReg')},
     {k:'高频',    lbl:()=>tr('tagFreq')},
     {k:'拼写变化', lbl:()=>tr('tagSpell')},
     {k:'词干变化', lbl:()=>tr('tagStem')},
-  ];
-  tagOpts.forEach(o=>{
+  ].forEach(o=>{
     const n = VERBS.filter(v => tagMatch(v, o.k)).length;
     const b=document.createElement('button');
     b.className='chip sm'; b.dataset.tag = o.k;
     b.setAttribute('aria-pressed', (s.tagFilter||'')===o.k);
     b.innerHTML = o.lbl() + ' <span style="opacity:.6;font-size:12px">'+n+'</span>';
-    b.onclick = ()=>{ s.tagFilter = (s.tagFilter===o.k ? '' : o.k); saveDB(); renderMenu(); };
-    tagBox.appendChild(b);
+    b.onclick = ()=>{ s.tagFilter = (s.tagFilter===o.k ? '' : o.k); syncActiveCustom(); saveDB(); repaintPick(); };
+    host.appendChild(b);
   });
-  /* 汇总：等级 ∩ 标签 ∩ 时态之后实际能出题的动词数，让「交集」一目了然 */
-  const poolN = buildPool().length;
-  const lvCounts = s.levels.map(x => x + ' ' + VERBS.filter(v=>v.l===x).length).join(' + ');
-  $('m-level-hint').innerHTML = esc(tr('levelHint', lvCounts))
-      + ' · <b>' + poolN + '</b> ' + esc(tr('poolUnit'));
-  $('m-lv-tense-hint').textContent = tr('lvHint');
-
-  // ---- 2 · 练习模式（单选）：切换时态选择不受影响，只收敛难度级别 ----
-  const moBox = $('m-modes'); moBox.innerHTML='';
-  MODES.forEach(m=>{
-    const b=document.createElement('button');
-    b.className='chip'; b.dataset.mode = m.k;
-    b.setAttribute('aria-pressed', s.modes[0] === m.k);
-    b.textContent = modeName(m.k);
-    b.title = modeDesc(m.k);
-    b.onclick = ()=>{
-      if(s.modes[0] === m.k) return;
-      s.modes = [m.k];
-      saveDB(); renderMenu();
-    };
-    moBox.appendChild(b);
-  });
-  /* 当前模式的玩法：按钮下方单独一行 */
-  $('m-mode-rule').innerHTML = '<b>' + esc(modeName(s.modes[0])) + '</b> · ' + esc(modeDesc(s.modes[0]));
-  const setBtn = $('m-set');
-  setBtn.textContent = SET_OPEN ? tr('setOpen') : tr('setBtn');
-  setBtn.setAttribute('aria-expanded', SET_OPEN ? 'true' : 'false');
-  setBtn.onclick = ()=>{ SET_OPEN = !SET_OPEN; renderMenu(); };
-  $('m-opt-panel').classList.toggle('hidden', !SET_OPEN);
-  $('m-opt-sh').textContent = tr('setScope', modeName(s.modes[0]));
-  // 设置项：用不上的项不隐藏，直接置灰不可点（并在 title 里说明原因）
-  const optDefs = {
-    showZh:       {label:()=>tr('optShowZh'),   title:()=>tr('optShowZhT')},
-    hideInf:      {label:()=>tr('optHideInf'),  title:()=>tr('optHideInfT')},
-    strictAccent: {label:()=>tr('optStrict'),   title:()=>tr('optStrictT')},
-    askTense:     {label:()=>tr('optAskTense'), title:()=>tr('optAskTenseT')},
-    type:         {label:()=>tr(s.inputMode==='type' ? 'typeType' : 'typeChoice'), title:()=>tr('optTypeT')},
-    vosotros:     {label:()=>tr('optVosotros'), title:()=>tr('optVosotrosT')},
-    onlyWrong:    {label:()=>tr('optOnlyWrong'),title:()=>tr('optOnlyWrongT')},
-  };
-  const OPT_ORDER = ['showZh','hideInf','strictAccent','askTense','type','vosotros','onlyWrong'];
-  const oBox = $('m-opts'); oBox.innerHTML='';
-  OPT_ORDER.forEach(k=>{
-    const d = optDefs[k];
-    const usable = optUsable(k, s.modes[0]);
+}
+/* 面板里的「推荐时态组」：固定 A1 / A2 / B1 / B2 四个键，点谁套谁 */
+function mkRecChips(host){
+  const s = DB.settings, allowed = ALL_TENSE_KEYS.slice();
+  host.innerHTML = '';
+  TENSE_RECS.forEach(lv=>{
+    const set = (LV_TENSE[lv] || []).filter(k => allowed.indexOf(k) > -1);
     const b = document.createElement('button');
-    const on = (k==='type' ? s.inputMode==='type' : !!s[k]) && usable;
-    b.className='chip sm' + (usable ? '' : ' off'); b.dataset.opt = k;
-    b.setAttribute('aria-pressed', on);
-    b.disabled = !usable;
-    b.textContent = d.label();
-    b.title = usable ? d.title() : tr('optOff');
-    b.onclick = ()=>{
-      if(!usable) return;
-      if(k==='type') s.inputMode = s.inputMode==='type' ? 'choice' : 'type';
-      else s[k] = !s[k];
-      saveDB(); renderMenu();
-    };
-    oBox.appendChild(b);
+    b.className = 'chip sm'; b.dataset.rec = lv;
+    const same = s.tenses.length === set.length && set.every(k => s.tenses.includes(k));
+    b.setAttribute('aria-pressed', same);
+    b.textContent = lv;
+    b.title = tr('tRecT', lv, set.length);
+    b.onclick = ()=>{ s.tenses = set.slice(); syncTenseOrder(); syncActiveCustom(); saveDB(); repaintPick(); };
+    host.appendChild(b);
   });
-  // 说明「隐藏原形」的生效范围：辨认 / 转换 / 平移模式生效，复现模式必须看到原形
-  {
-    const off = s.modes[0] === 'produce';
-    $('m-opt-hint').innerHTML = !s.hideInf
-      ? tr('hideInfOff')
-      : (off ? tr('hideInfOnNone') : tr('hideInfOn'))
-        + (s.showZh && !off ? tr('hideInfZhWarn') : '');
-  }
-
-  // ---- 4 · 时态：2×2 语式网格（第一行 陈述式 / 条件式，第二行 虚拟式 / 命令式），
-  // 每个语式框内部「上层简单时态、下层复合时态」，完全自由多选 ----
-  const tBox = $('m-tenses'); tBox.innerHTML='';
+}
+/* 面板里的「时态」网格：2×2 语式，组内上层简单 / 下层复合，完全自由多选 */
+function mkTenseGrid(host){
+  const s = DB.settings;
+  host.innerHTML = '';
   const tgs = document.createElement('div');
   tgs.className = 'tgs';
   TENSE_GROUPS.forEach(gp=>{
@@ -1451,20 +2038,19 @@ function renderMenu(){
     act.appendChild(badge);
     const bAll = document.createElement('button');
     bAll.textContent = tr('groupAll');
-    /* 按钮文案在窄列里已精简成「全选 / 清空」，完整含义放进 title / aria-label */
     bAll.title = gName(gp.k) + ' · ' + tr('groupAll') + ' (' + inG.length + ')';
     bAll.setAttribute('aria-label', gName(gp.k) + ' · ' + tr('groupAll'));
-    bAll.onclick = ()=>{ inG.forEach(t=>{ if(!s.tenses.includes(t.k)) s.tenses.push(t.k); }); syncTenseOrder(); saveDB(); renderMenu(); };
+    bAll.onclick = ()=>{ inG.forEach(t=>{ if(!s.tenses.includes(t.k)) s.tenses.push(t.k); });
+                         syncTenseOrder(); syncActiveCustom(); saveDB(); repaintPick(); };
     const bNone = document.createElement('button');
     bNone.textContent = tr('groupNone');
     bNone.title = gName(gp.k) + ' · ' + tr('groupNone');
     bNone.setAttribute('aria-label', gName(gp.k) + ' · ' + tr('groupNone'));
-    bNone.onclick = ()=>{ s.tenses = s.tenses.filter(k => !inG.some(t=>t.k===k)); saveDB(); renderMenu(); };
+    bNone.onclick = ()=>{ s.tenses = s.tenses.filter(k => !inG.some(t=>t.k===k));
+                          syncActiveCustom(); saveDB(); repaintPick(); };
     act.appendChild(bAll); act.appendChild(bNone);
     head.appendChild(act);
     wrap.appendChild(head);
-
-    // 组内两层：上层简单 / 下层复合
     wrap.appendChild(tenseRows(inG, t => {
       const b = document.createElement('button');
       b.className = 'chip sm tint g-' + t.g;
@@ -1477,50 +2063,103 @@ function renderMenu(){
       b.onclick = ()=>{
         const i = s.tenses.indexOf(t.k);
         if(i>-1) s.tenses.splice(i,1); else s.tenses.push(t.k);
-        syncTenseOrder(); saveDB(); renderMenu();
+        syncTenseOrder(); syncActiveCustom(); saveDB(); repaintPick();
       };
       return b;
     }));
     tgs.appendChild(wrap);
   });
-  tBox.appendChild(tgs);
-  // 时态工具按钮（全选 / 清空）
-  const allowedKeys = ALL_TENSE_KEYS.slice();
-  $('m-t-all').onclick = ()=>{ s.tenses = allowedKeys.slice(); saveDB(); renderMenu(); };
-  $('m-t-none').onclick = ()=>{ s.tenses = []; saveDB(); renderMenu(); };
-  /* 「推荐时态组」固定成 A1 / A2 / B1 / B2 四个键，不跟随上方难度选择变化：
-     点哪个键就套用那个等级的时态组，按下的键高亮。 */
-  const recBox = $('m-t-recs'); recBox.innerHTML = '';
-  const recLabel = document.createElement('span');
-  recLabel.className = 'meta';
-  recLabel.textContent = tr('tRec');
-  recBox.appendChild(recLabel);
-  TENSE_RECS.forEach(lv=>{
-    const set = (LV_TENSE[lv] || []).filter(k => allowedKeys.indexOf(k) > -1);
+  host.appendChild(tgs);
+}
+/* 面板里的「其它」：答题方式（分段控件）+ 三个开关，全做成和右栏设置同款的
+   「文字标签 + 拨动开关」行（不再用气泡 chip），都随这套设置走 */
+function mkOtherChips(host){
+  const s = DB.settings;
+  host.innerHTML = '';
+  const seg = document.createElement('div');
+  seg.className = 'seg';
+  seg.id = 'm-seg';
+  [['type','typeType'],['choice','typeChoice']].forEach(([k,lbl])=>{
     const b = document.createElement('button');
-    b.className = 'chip sm'; b.dataset.rec = lv;
-    /* 高亮条件：当前时态选择正好等于该等级的时态组 */
-    const same = s.tenses.length === set.length && set.every(k => s.tenses.includes(k));
-    b.setAttribute('aria-pressed', same);
-    b.textContent = lv;
-    b.title = tr('tRecT', lv, set.length);
-    b.onclick = ()=>{ s.tenses = set.slice(); syncTenseOrder(); saveDB(); renderMenu(); };
-    recBox.appendChild(b);
+    b.type = 'button';
+    b.dataset.mode = k;
+    b.setAttribute('aria-pressed', s.inputMode === k);
+    b.textContent = tr(lbl);
+    b.onclick = ()=>{ s.inputMode = k; syncActiveCustom(); saveDB(); repaintPick(); };
+    seg.appendChild(b);
   });
-  const noTense = s.tenses.length === 0;
-  $('m-t-count').innerHTML = s.tenses.length
-      ? tr('tCount', s.tenses.length, allowedKeys.length)
+  const rowMode = document.createElement('div');
+  rowMode.className = 'setrow';
+  rowMode.innerHTML = '<div class="st"><b>'+esc(tr('optType'))+'</b>'
+    + '<small>'+esc(tr('optTypeT'))+'</small></div>';
+  const sc0 = document.createElement('div');
+  sc0.className = 'sc';
+  sc0.appendChild(seg);
+  rowMode.appendChild(sc0);
+  host.appendChild(rowMode);
+  /* 显示中文释义 / 严格要求重音 已移到齿轮设置（#st）；
+     辨认模式同时问时态的选项已删除（默认问，仅单时态时自动跳过）。 */
+}
+/* 重画面板内部（不动键，也不重排整个菜单）—— 面板里的每一次改动都走这里 */
+function repaintPick(){
+  /* 面板没在编辑状态（还没选档 / 刚清空）就没有可填的控件，只重画键 */
+  if(!DB.activeKey || !$('m-levels')){ renderPresets(); return; }
+  mkLevelChips($('m-levels'));
+  mkTagChips($('m-tags'));
+  mkRecChips($('m-t-recs'));
+  mkTenseGrid($('m-tenses'));
+  mkOtherChips($('m-opt-chips'));
+  const c = $('m-t-count');
+  if(c) c.innerHTML = DB.settings.tenses.length
+      ? tr('tCount', DB.settings.tenses.length, ALL_TENSE_KEYS.length)
       : tr('tCountNone');
-
-  // ---- 词池 ----
+  const h = $('m-level-hint');
+  if(h) h.innerHTML = '<b>' + buildPool().length + '</b> ' + esc(tr('poolUnit'));
+  renderStartbar();         /* 改了词库 / 时态，底部开始栏（题库摘要 / 开始按钮）跟着刷新 */
+  renderPresets();          /* 键上的「还没设置」→ 已保存、以及面板高度都跟着更新 */
+}
+/* 设置项一律可用：选项都搬到右侧设置栏，不再随模式置灰 ——
+   少数只在某些模式下生效的（隐藏原形），在说明里写清楚即可。 */
+function renderMenu(){
+  const s = DB.settings;
+  syncTenseOrder();
+  applyStatic();
+  renderPickPanel();                        /* 先把面板内容换好（未选难度档时面板空着） */
+  if(!DB.activeKey) renderPresets();         /* 还没选档：只画 6 个键，全部不亮 */
+  else if(!presetOf(DB.activeKey)) repaintPick(); /* 自定义：画完控件，repaintPick 末尾的 renderPresets 再量高度 */
+  else renderPresets();                      /* 预设：内容换好后再量 —— 否则量到旧的高面板，留下大段空白 */
+  /* 练习模式：单选。题型独立于上面任何一个键 —— 键只管「练什么词、哪些时态」。 */
+  const moBox = $('m-modes'); moBox.innerHTML='';
+  MODES.forEach(m=>{
+    const b=document.createElement('button');
+    b.className='chip'; b.dataset.mode = m.k;
+    b.setAttribute('aria-pressed', s.modes[0] === m.k);
+    b.innerHTML = m.icon + ' ' + esc(modeName(m.k));
+    b.title = modeDesc(m.k);
+    b.onclick = ()=>{
+      if(s.modes[0] === m.k) return;
+      s.modes = [m.k];
+      saveDB(); renderMenu();
+    };
+    moBox.appendChild(b);
+  });
+  $('m-mode-rule').innerHTML = '<b>' + esc(modeName(s.modes[0])) + '</b> · ' + esc(modeDesc(s.modes[0]));
+  renderStartbar();
+}
+/* 常驻底栏：题库摘要 + 开始按钮的禁用 / 文案。
+   独立成函数 —— 面板里改等级 / 标签 / 时态（repaintPick）也要刷新它，
+   否则「清空时态后开始按钮还是亮的」这类不同步就来了。 */
+function renderStartbar(){
+  const s = DB.settings;
   const pool = buildPool();
   const warns = [];
   if(s.modes[0] === 'shift' && s.tenses.length === 1)   warns.push(tr('warnShift'));
   if(s.modes[0] === 'transfer' && pool.length < 2)      warns.push(tr('warnTransfer'));
   const warn = warns.length ? tr('warnTail', warns.join(lang()==='en' ? ', ' : '、')) : '';
+  const noTense = s.tenses.length === 0;
   $('m-pool').innerHTML = noTense
       ? tr('poolNoTense')
-      : (tr('pool', pool.length, s.tenses.length) + (s.onlyWrong ? tr('poolWrong') : '') + warn);
+      : (tr('pool', pool.length, s.tenses.length) + warn);
   $('m-start').disabled = pool.length===0 || noTense;
   $('m-start').textContent = noTense ? tr('startPick')
       : (pool.length ? tr('start') : tr('startEmpty'));
@@ -1597,11 +2236,7 @@ function buildPool(){
   let list = VERBS.filter(v => s.levels.includes(v.l));
   list = list.filter(v => s.tenses.some(k => forms(v,k)));
   if(s.tagFilter) list = list.filter(v => tagMatch(v, s.tagFilter));
-  if(s.onlyWrong){
-    const w = DB.stats.verbs;
-    const wrongList = list.filter(v => w[v.i] && w[v.i].err > 0);
-    if(wrongList.length) list = wrongList;
-  }
+  /* 「只练我的错题」已下线：以后改成按错误率动态调出题频率（那一版会直接改 weightOf） */
   return list;
 }
 
@@ -1635,18 +2270,21 @@ function makeQuestion(){
     const v = pickVerb(pool);
     const tp = tensePoolOf(v);
     if(!tp.length) continue;
-    /* 时态转换需要至少 2 个时态；平移模式需要题库里至少 2 个动词。否则退回其他模式 */
+    /* 时态转换需要至少 2 个时态；平移模式需要题库里至少 2 个动词。
+       都不满足时不再固定退回复现模式 —— 换成「本次真正能出题」的那几个模式里挑一个，
+       否则用户明明选了辨认，却拿到一屏手写输入，会以为设置坏了。 */
     let modes = s.modes.filter(m => (m !== 'shift' || tp.length >= 2)
                                  && (m !== 'transfer' || pool.length >= 2));
-    if(!modes.length) modes = ['produce'];
+    if(!modes.length) modes = ['recognize','produce'];
     const q = {inf:v.i, idx:VERBS.indexOf(v), zh:v.z, g:v.g, lv:v.l,
-               mode: pick(modes), tense: pick(tp), userAnswer:null, correct:null};
+               mode: pick(modes), tense: pick(tp), userAnswer:null, correct:null,
+               s: qSnap()};   /* 本题的设置快照：渲染与判分都只认它 */
     const f = forms(v, q.tense);
     const ps = askedPersons(q.tense).filter(i => f[i] && f[i].trim());
     if(!ps.length) continue;
     q.person = pick(ps);
     q.answer = f[q.person];
-    if(q.mode === 'recognize') q.hits = formHits(v, q.answer);
+    if(q.mode === 'recognize'){ q.hits = formHits(v, q.answer); q.askTense = recAskTense(q); }
     if(q.mode === 'shift'){
       const others = tp.filter(k => k!==q.tense);
       if(!others.length) continue;
@@ -1694,8 +2332,11 @@ function makeQuestion(){
     if(SESS.recent.includes(key)) continue;
     SESS.recent.push(key); if(SESS.recent.length>24) SESS.recent.shift();
     q.key = key;
-    if(q.mode==='recognize' && s.askTense){ q.pickPerson = null; q.pickTense = null; }
-    else if(q.mode==='recognize'){ q.pickPerson = null; }
+    if(q.mode==='recognize'){
+      q.pickPerson = null;
+      q.pickTense = q.askTense ? null : q.tense;
+      q.userInf = '';
+    }
     if(s.inputMode==='choice' && q.mode!=='recognize') q.options = buildOptions(q, VERBS[q.idx]);
     return q;
   }
@@ -1710,45 +2351,94 @@ function recognizeTenseChips(v, onlyCp){
   });
   return {avail, out};
 }
+/* 辨认模式要不要出「选时态」：当选中的时态里、与本题同类（简单 / 复合）且动词确有形式的
+   不止一个时才问；否则只有一种可能，问了也没意义 → 直接按本题时态算对。
+   （「辨认模式同时问时态」不再作为可关开关，默认就问，仅单时态情形自动跳过。） */
+function recAskTense(q){
+  if(q.mode !== 'recognize') return false;
+  const v = VERBS[q.idx]; if(!v) return false;
+  const sel = DB.settings.tenses || [];
+  const onlyCp = T[q.tense].cp ? 1 : 0;
+  const opts = TENSES.filter(x => (x.cp ? 1 : 0) === onlyCp
+      && sel.indexOf(x.k) > -1 && tensePoolOf(v).indexOf(x.k) > -1);
+  return opts.length > 1;
+}
+/* 选择题的选项：4~6 个，正确答案一定在里面，且不出现「同样算对」的第二个正确答案。
+   干扰项分两级
+     ① 同一人称的其他时态（hablo / hablé / hablaba / hablaré）——真实混淆源，优先
+     ② 同一时态的其他必问人称（hablo / hablas / habla…）——兜底
+   转换模式额外把「原时态那一格」放进来（那一栏也要用户判断）。
+   放进 6 个而不是 4 个：六个格子在 auto-fit 网格里排成 4+2，视觉上比 3+1 稳。 */
 function buildOptions(q, v){
-  /* 只选一个 mode 后干扰项不必再跨时态凑数：
-     ① 转换模式（同动词换时态）用目标时态的其他必问人称
-     ② 其余模式用同一个动词的其他必问人称；不够 4 个再补其他时态同人称 */
-  const set = new Set(); const out = [];
   const tKey = q.mode==='shift' ? q.tense2 : q.tense;
-  out.push(q.answer); set.add(norm(q.answer));          // 选项里始终保留正确答案
-  /* 平移模式里「同样算对」的备选形式不能拿来当干扰项，否则会出现两个正确答案 */
-  if(q.answersAlt) q.answersAlt.forEach(x => set.add(norm(x)));
-  /* 本题的「必问人称」（第 6 人称被设置过滤掉时不再算入） */
-  const asked = validPersons(tKey).filter(i => DB.settings.vosotros || i !== 4);
-  const f0 = forms(v, q.tense);
-  /* 转换模式同时问「原时态」那一栏的答案，所以两个时态的形式都要在里面 */
-  if(q.mode === 'shift' && q.answer2 !== q.answer){ out.push(q.answer2); set.add(norm(q.answer2)); }
+  const taken = new Set();            /* norm 后的去重表，正确答案 + 备选答案 */
+  const out = [];
+  const add = (x, lock) => {
+    const s = String(x == null ? '' : x).trim();
+    if(!s) return false;
+    if(lock){ taken.add(norm(s)); return true; }
+    if(taken.has(norm(s))) return false;
+    taken.add(norm(s)); out.push(s); return true;
+  };
+  /* 正确答案永远在第一个（taken 先把它们占住，后面的干扰项就不会撞） */
+  add(q.answer, true);
+  if(q.answersAlt) q.answersAlt.forEach(x => add(x, true));
+  if(q.mode === 'shift' && norm(q.answer2) !== norm(q.answer)) add(q.answer2, true);
+  /* 这两个格子本题已经问过 / 已经给了，不能当干扰项 */
+  const skip = new Set([norm(q.answer), norm(q.answer2 || '')]);
+  const asked = validPersons(tKey).filter(i => (q.s ? q.s.vosotros : DB.settings.vosotros) || i !== 4);
+
+  const cands = [];
+  /* ① 同一人称的其他时态 */
+  tensePoolOf(v).forEach(k => {
+    if(k === q.tense || k === q.tense2) return;
+    const f = forms(v, k);
+    const x = f && f[q.person] ? String(f[q.person]).trim() : '';
+    if(x && !skip.has(norm(x))) cands.push({x, near: 1});
+  });
+  /* ② 同一时态的其他必问人称 */
   const f = forms(v, tKey);
-  const others = asked.filter(i => i!==q.person && f[i] && f[i].trim());
-  for(let i=0;i<8 && out.length<4 && others.length;i++){
-    const x = f[others.splice(rnd(others.length),1)[0]];
-    if(!set.has(norm(x))){ out.push(x); set.add(norm(x)); }
-  }
-  /* 该时态变位变体太少（如否定命令式的单数人称）时，补「其他时态同人称」的形式凑满 4 个 */
-  const tp = tensePoolOf(v).filter(k => k!==q.tense && k!==q.tense2);
-  for(let i=0;i<10 && out.length<4 && tp.length;i++){
-    const k = tp.splice(rnd(tp.length),1)[0];
-    const ff = forms(v,k);
-    if(ff && ff[q.person] && ff[q.person].trim() && !set.has(norm(ff[q.person]))){
-      out.push(ff[q.person]); set.add(norm(ff[q.person]));
-    }
-  }
-  /* 仍是 3 个（人称实在不够）就补「原时态其他必问人称」，保证选择题有 4 个选项 */
-  if(out.length < 4 && f0){
-    const rest = asked.filter(i => i!==q.person && f0[i] && f0[i].trim()
-                               && !set.has(norm(f0[i])));
-    for(let i=0;i<4 && out.length<4 && rest.length;i++){
-      const x = f0[rest.splice(rnd(rest.length),1)[0]];
-      if(!set.has(norm(x))){ out.push(x); set.add(norm(x)); }
-    }
-  }
+  if(f) asked.forEach(i => {
+    if(i === q.person) return;
+    const x = f[i] ? String(f[i]).trim() : '';
+    if(x && !skip.has(norm(x))) cands.push({x, near: 0});
+  });
+  /* ③ 原时态的其他必问人称（人称实在不够时兜底，如否定命令式的单数人称） */
+  const f0 = forms(v, q.tense);
+  if(f0 && q.tense !== tKey) asked.forEach(i => {
+    if(i === q.person) return;
+    const x = f0[i] ? String(f0[i]).trim() : '';
+    if(x && !skip.has(norm(x))) cands.push({x, near: 0});
+  });
+  /* Fisher-Yates：先打散，再做「近似优先」的稳定排序 ——
+     否则 cands 的构造顺序固定，出题会老是同几个选项 */
+  for(let i = cands.length - 1; i > 0; i--){ const j = rnd(i + 1); const t = cands[i]; cands[i] = cands[j]; cands[j] = t; }
+  cands.sort((a, b) => b.near - a.near);
+  /* 封顶 5 个干扰项：正确答案此刻还不在 out 里（只锁进了 taken），
+     兜底 unshift 会把它补到最前 —— 总数恰好 ≤ 6。封顶 6 会产出 7 个选项。 */
+  for(let i = 0; i < cands.length && out.length < 5; i++) add(cands[i].x);
+  /* 兜底不变量：**正确答案永远在选项里**。
+     上面的逻辑（锁住答案 + 排除同义形式）正常情况下保证了这一点，
+     但这是选择题的生命线 —— 一旦破掉就是「怎么点都不对」，所以再加一道硬防线。 */
+  const want = norm(q.answer);
+  if(!out.some(x => norm(x) === want)) out.unshift(q.answer);
   return out;
+}
+/* 出题时把「只有出题时才知道、渲染时不再改」的东西一次记牢：
+   · s = 本题使用的设置快照（答题方式 / 显示释义 / 隐藏原形 / 严格重音）
+   · mode = 出题时的练习模式
+   渲染时**只读 q.s 与 q.mode，绝不读 DB.settings** —— 这样无论中途怎么改设置，
+   题干、选项、判分口径永远自洽（「选项里没有正确答案」「辨认模式里冒出输入框」
+   这类问题的根子就是渲染时读了会变的全局设置）。 */
+function qSnap(){
+  const s = DB.settings;
+  return {
+    inputMode: s.inputMode,
+    showZh: !!s.showZh,
+    hideInf: !!s.hideInf,
+    strictAccent: !!s.strictAccent,
+    vosotros: !!s.vosotros
+  };
 }
 
 /* ============================================================
@@ -1767,22 +2457,23 @@ function revealInf(inf){
 function renderPractice(){
   const q = SESS.history[SESS.cur];
   const wrap = $('p-body');
+  /* 本题的设置快照：出题时就记下来了。渲染一律读它，不读 DB.settings ——
+     这样中途改设置也不会让「题干 / 选项 / 判分口径」三者对不上。 */
+  const qs = (q && q.s) || qSnap();
   $('p-progress').innerHTML = tr('progress', SESS.cur+1, SESS.history.length,
                                  (SESS.done? Math.round(SESS.right/SESS.done*100) : 0));
   $('p-prev').disabled = SESS.cur <= 0;
-  $('p-zh').textContent = DB.settings.showZh ? tr('zhOn') : tr('zhOff');
-  $('p-zh').style.color = DB.settings.showZh ? 'var(--accent)' : '';
-  /* 「不看原形」只在菜单的设置面板里改 */
   if(!q){ wrap.innerHTML = '<div class="card center">'+esc(tr('emptyPoolAlert'))+'</div>'; return; }
 
   const v = VERBS[q.idx];
   const t = T[q.tense];
-  /* 中文释义行始终占住一格高度（关掉时只是隐形），开关时下方内容不移动 */
-  const zhLine = '<div class="zh zh-line' + (DB.settings.showZh ? '' : ' off') + '">'
+  /* 中文释义行始终占住一格高度（关掉时只是隐形），开关时下方内容不移动。
+     开关值取自本题快照 —— 中途改全局设置不会影响已出的题。 */
+  const zhLine = '<div class="zh zh-line' + (qs.showZh ? '' : ' off') + '">'
       + esc(meaningOf(v)) + '</div>';
   /* 隐藏原形只在辨认 / 转换 / 平移模式且本题未作答时生效，作答后自动显示方便复盘；
      本题内点过「看原形」（q.peeked）就保持显示，重绘也不会再盖回去 */
-  const hideInfOn = !!DB.settings.hideInf && q.mode !== 'produce' && q.correct === null && !q.peeked;
+  const hideInfOn = !!qs.hideInf && q.mode !== 'produce' && q.correct === null && !q.peeked;
   /* 显示原形 与「隐藏成一个按钮」两种状态共用 .inf-line 这层固定高度的壳；
      隐藏态整行就是那个按钮本身（不再有 ? ? ? 占位），所以点击前后高度一致 */
   const infLine = '<div class="inf-line">' + (hideInfOn
@@ -1796,9 +2487,15 @@ function renderPractice(){
 
   if(q.mode==='recognize'){
     head = '<div class="meta">'+esc(tr('mz').recognize)+'</div>';
+    /* 辨认模式考三项：① 从这个变位形式认出动词、手写出原形；② 判断主语人称；③（多时态时）选时态。
+       原形强制不显示，用输入框让玩家自己拼出来；中文释义按全局「显示中文释义」决定。 */
     body = '<div class="qbox">'
-        + infLine + zhLine
         + '<div class="verb-big" style="margin:10px 0 4px">'+esc(q.answer)+'</div>'
+        + zhLine
+        + '<div class="field"><div class="row tight" style="align-items:center;gap:8px">'
+        + '<label class="inflbl" for="p-inf">'+esc(tr('infLabel'))+'</label>'
+        + '<input type="text" id="p-inf" autocomplete="off" autocapitalize="off" spellcheck="false"'
+        + ' placeholder="'+esc(tr('infPh'))+'" class="inf-input"></div></div>'
         + '</div>';
     /* 人称选项：第一行单数、第二行复数，一行三个人称；窄屏自动换成短标签。
        所有时态（含命令式）一律给足 6 个人称、用通用标签——不要删 yo：
@@ -1806,18 +2503,17 @@ function renderPractice(){
        ② hable 这类同形形式也可以是虚拟式的 yo，少了 yo 就答不了这种读法。
        同形多答案由 formHits 判定兜底（见 submitAnswer 的 recognize 分支）。 */
     const mkOpt = i => '<button class="opt" data-pick="'+i+'" title="'+esc(PERSONS[i].l+' · '+personOrd(i))+'">'
-        + '<span class="pol"><span class="w">'+esc(PERSONS[i].l)+'</span>'
-        + '<span class="s">'+esc(PERSONS[i].sl)+'</span></span>'
+        + '<span class="pol"><i class="w">'+esc(personProSet(i, q.tense).join(' / '))+'</i></span>'
         + '<small>'+esc(personGloss(i))+'</small></button>';
     body += '<div class="opts persons" id="p-persons">'
         + '<div class="orow">'+PERS_ROW1.map(mkOpt).join('')+'</div>'
         + '<div class="orow">'+PERS_ROW2.map(mkOpt).join('')+'</div>'
         + '</div>';
-    if(DB.settings.askTense){
+    if(q.askTense){
       body += '<div class="tpick" id="p-tenses"></div>';
     }
-    hint = (hideInfOn ? tr('hRecHide') : '')
-         + tr('hRec') + tr(t.cp ? 'compoundT' : 'simpleT') + tr('hRec2') + tr('hRec3');
+    hint = tr('recInfHint')
+         + (q.askTense ? (tr('hRec') + tr(t.cp ? 'compoundT' : 'simpleT') + tr('hRec2') + tr('hRec3')) : '');
   }
   else if(q.mode==='produce'){
     head = '<div class="meta">'+esc(tr('mz').produce)+'</div>';
@@ -1886,7 +2582,7 @@ function renderPractice(){
 
   // 辨认模式：时态选项框
   // 只列与本题同类（简单 / 复合）的时态，否则同类时态一行放不下
-  if(q.mode==='recognize' && DB.settings.askTense){
+  if(q.mode==='recognize' && q.askTense){
     const host = $('p-tenses');
     const onlyCp = t.cp ? 1 : 0;                       // 本题属于简单时态还是复合时态
     const avail = TENSES.filter(x => forms(v, x.k) && (x.cp ? 1 : 0) === onlyCp);
@@ -1927,13 +2623,22 @@ function renderPractice(){
   const goBtn = $('p-go');
   const upd = ()=>{
     if(q.mode==='recognize'){
-      const can = selP !== null && (!DB.settings.askTense || selT !== null);
+      const infOk = (q.userInf || '').trim().length > 0;
+      const can = infOk && selP !== null && (!q.askTense || selT !== null);
       goBtn.disabled = !can && !answerLocked;
       document.querySelectorAll('#p-persons .opt').forEach(b=>b.classList.toggle('sel', +b.dataset.pick===selP));
       document.querySelectorAll('#p-tenses .chip').forEach(b=>b.setAttribute('aria-pressed', b.dataset.tense===selT));
-    } else if(DB.settings.inputMode==='choice'){
+    } else if(qs.inputMode==='choice'){
       goBtn.disabled = !q.pickChoice && !answerLocked;
-      document.querySelectorAll('#p-choices .opt').forEach(b=>b.classList.toggle('sel', b.dataset.v===q.pickChoice));
+      const prev = q.pickChoiceSeen;
+      document.querySelectorAll('#p-choices .opt').forEach(b=>{
+        const on = b.dataset.v === q.pickChoice;
+        b.classList.toggle('sel', on);
+        /* 点选的即时反馈：只有「这次新选中的那个」跳一下。
+           用 seen 这个已选标记，重绘 / 顺手再点同一个不会重播动画 */
+        if(on && q.pickChoice !== prev) once(b, 'fxsel');
+      });
+      q.pickChoiceSeen = q.pickChoice || null;
     }
   };
   if(q.mode==='recognize'){
@@ -1943,6 +2648,16 @@ function renderPractice(){
     document.querySelectorAll('#p-tenses .chip').forEach(b=>{
       b.onclick = ()=>{ if(answerLocked) return; selT = b.dataset.tense; q.pickTense = selT; upd(); };
     });
+    const infInp = $('p-inf');
+    if(infInp){
+      if(answerLocked){
+        infInp.value = q.userInf || ''; infInp.disabled = true;
+        infInp.classList.add(q.infOK ? 'ok' : 'bad');
+      } else {
+        infInp.value = ''; infInp.classList.remove('ok','bad');
+        infInp.oninput = ()=>{ q.userInf = infInp.value; upd(); };
+      }
+    }
     upd();
     if(answerLocked){   // 回看已答题目：标出对错（同形的读法都算对)
       const hits = q.hits || (q.hits = formHits(v, q.answer));
@@ -1962,11 +2677,18 @@ function renderPractice(){
         b.setAttribute('aria-pressed', k === q.pickTense);
       });
     }
-  } else if(DB.settings.inputMode==='type'){
+  } else if(qs.inputMode==='type'){
     const inp = $('p-input');
     if(inp){
       if(answerLocked){ inp.value = q.userAnswer || ''; inp.disabled = true; }
-      else inp.focus();
+      else{
+        /* 手写模式下整屏重绘后要显式清掉上一次的判定色：
+           .ok / .bad 是写进属性里的，不清就会把上一题的绿框带到新题上 */
+        inp.value = '';
+        inp.classList.remove('ok','bad','fxok','fxbad');
+        inp.disabled = false;
+        inp.focus();
+      }
     }
   } else {
     document.querySelectorAll('#p-choices .opt').forEach(b=>{
@@ -2008,13 +2730,10 @@ function renderPractice(){
 
   if(answerLocked) showFeedback(q, true);
 }
-/* 多主语人称（él/ella/usted…）每题随机显示一个，只需认出人称，不并列三个代词；
-   命令式每格只对应一个代词（usted / ustedes…），不再出现 él / ella / ellos */
+/* 多主语人称（él/ella/usted…）把整组代词都列出来，不再随机只显示一个：
+   拉美的 ustedes 同时对应「你们」和「诸位」，只显示一个反而让人以为题目出错了 */
 function subjectOf(q){
-  if(!q.subj){
-    const list = personPro(q.person, qTense(q));
-    q.subj = list[rnd(list.length)];
-  }
+  if(!q.subj) q.subj = personProSet(q.person, qTense(q)).join(' / ');
   return q.subj;
 }
 /* 主语提示只给西语代词：中文 / 英文释义一律不显示（完整人称说明放在 title 里） */
@@ -2025,12 +2744,21 @@ function subjectCue(q){
 }
 function answerArea(q){
   const subj = subjectCue(q);
-  if(DB.settings.inputMode==='type'){
+  const qs = q.s || qSnap();
+  /* 手写 / 选择由**本题的快照**决定，不看当前全局设置 —— 中途改设置不会让
+     「出的是选择题、却渲染成输入框」。 */
+  if(qs.inputMode==='type'){
     return '<div class="field"><div class="ansrow">'+subj
         + '<input type="text" id="p-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="'
         + esc(tr('placeholder'))+'"></div></div>';
   }
-  const arr = q.options;
+  /* 硬防线：需要选项却没有（历史遗留数据 / 极端分支）就当场补一份，
+     绝不让「选项里没有正确答案」这种状态渲染出去。 */
+  let arr = q.options;
+  if(!Array.isArray(arr) || !arr.length){
+    arr = buildOptions(q, VERBS[q.idx]);
+    q.options = arr;
+  }
   return '<div class="row" style="margin-top:12px">'+subj+'</div>'
        + '<div class="opts three" id="p-choices">' + arr.map(x =>
       '<button class="opt" data-v="'+esc(x)+'">'+esc(x)+'</button>').join('') + '</div>';
@@ -2039,20 +2767,27 @@ function submitAnswer(){
   const q = SESS.history[SESS.cur];
   if(q.correct !== null) return;
   const v = VERBS[q.idx];
+  const qs = q.s || qSnap();
   let ok = false, soft = false, given = '';
   if(q.mode==='recognize'){
+    const infInp = $('p-inf');
+    if(infInp) q.userInf = infInp.value;
+    const given0 = (q.userInf || '').trim();
     const selP = q.pickPerson, selT = q.pickTense;
-    const askT = !!DB.settings.askTense;
+    const askT = q.askTense;
+    if(!given0) return;
     if(selP === null) return;
     if(askT && selT === null) return;
+    const infOK = norm(given0) === norm(q.inf);
     const hits = q.hits || (q.hits = formHits(v, q.answer));
     /* 同形判定：所选人称/时态只要是这个形式的真实读法就算对
        （compramos 既是现在时也是简单过去时；habla 既是现在时 él 也是肯定命令式 tú） */
     const hp = hits.filter(x => x.p === selP);
     q.personOK = hp.length > 0;
-    ok = askT ? hp.some(x => x.k === selT) : q.personOK;
-    if(askT) q.tenseOK = hp.some(x => x.k === selT);
-    given = PERSONS[selP].l + (askT ? ' · ' + tName(selT) : '');
+    if(askT){ q.tenseOK = hp.some(x => x.k === selT); ok = infOK && hp.some(x => x.k === selT); }
+    else    { q.tenseOK = true; ok = infOK && q.personOK; }
+    given = PERSONS[selP].l + (askT ? ' · ' + tName(selT) : '') + ' · ' + given0;
+    q.infOK = infOK;
     q.altPersons = uniq(hits.map(x=>x.p)).sort((a,b)=>a-b);
     q.altTenses = uniq(hits.map(x=>x.k));
     q.personTenses = uniq(hp.map(x=>x.k));
@@ -2060,41 +2795,63 @@ function submitAnswer(){
     const inp = $('p-input');
     given = inp ? inp.value : (q.pickChoice||'');
     if(!given.trim()) return;
-    const r = judge(given, q.answer, DB.settings.strictAccent, q.tense);
+    const r = judge(given, q.answer, qs.strictAccent, q.tense);
     ok = r.ok; soft = r.soft;
   } else if(q.mode==='shift'){
     const inp = $('p-input');
     given = inp ? inp.value : (q.pickChoice||'');
     if(!given.trim()) return;
-    const r = judge(given, q.answer2, DB.settings.strictAccent, q.tense2);
+    const r = judge(given, q.answer2, qs.strictAccent, q.tense2);
     ok = r.ok; soft = r.soft;
   } else {   /* transfer · 平移模式：判定 B 动词的变位 */
     const inp = $('p-input');
     given = inp ? inp.value : (q.pickChoice||'');
     if(!given.trim()) return;
     /* A 出示的形式若有多重读法，B 在那些读法下的形式同样接受（见 makeQuestion 里的说明） */
-    const r = judge(given, [q.answer].concat(q.answersAlt || []), DB.settings.strictAccent, q.tense);
+    const r = judge(given, [q.answer].concat(q.answersAlt || []), qs.strictAccent, q.tense);
     ok = r.ok; soft = r.soft;
     if(ok) q.altMatched = q.answersAlt.find(x => norm(x) === norm(cleanAnswer(given))) || null;
   }
   q.userAnswer = given; q.correct = ok; q.soft = soft; q.ansShown = (q.mode==='shift'? q.answer2 : q.answer);
   SESS.done++; if(ok) SESS.right++;
   recordAnswer(q);
+  /* 「错在哪一类」要先算好再渲染反馈 —— 以前放在 showFeedback 之后，诊断句永远缺席 */
+  if(!ok && !q.fxDiag) q.diag = diagOf(q);
+  q.fxDiag = 1;
   showFeedback(q, false);
   const btn = $('p-go'); btn.textContent = tr('next'); btn.disabled = false;
   $('p-progress').innerHTML = tr('progress', SESS.cur+1, SESS.history.length,
                                  Math.round(SESS.right/SESS.done*100));
-  const inp = $('p-input'); if(inp) inp.disabled = true;
+  const inp = $('p-input');
+  if(inp){
+    inp.disabled = true;
+    /* 手写模式的判定反馈：绿/红描边脉冲一次，答错再加一次轻微抖动。
+       只动 border / box-shadow / transform，不改字号内边距 ——
+       输入框尺寸一变，题干下方所有内容都会跟着跳。 */
+    if(!q.fxIn){
+      q.fxIn = 1;
+      const mark = ok ? 'ok' : 'bad';
+      inp.classList.add(mark);
+      once(inp, 'fx' + mark, 800);
+    }
+  }
+  /* 读屏播报一句结果（面板是 innerHTML 重绘，没有 live 区就完全听不到） */
+  const live = $('p-live');
+  if(live) live.textContent = (ok ? tr('ok') : (soft ? tr('warn') : tr('bad')))
+                             + (q.diag ? (lang()==='en' ? '. ' : '。') + q.diag : '');
 }
 function showFeedback(q, review){
   const v = VERBS[q.idx];
   const fb = $('p-feedback'); if(!fb) return;
+  const qs = q.s || qSnap();   /* 本题设置快照（qs.askTense 等）—— 渲染一律读快照 */
   const ans = q.ansShown || (q.mode==='shift' ? q.answer2 : q.answer);
   const t = T[q.mode==='shift' ? q.tense2 : q.tense];
   let cls = 'ok', mark = '✓', title = tr('ok');
   if(!q.correct) { cls='bad'; mark='✗'; title=tr('bad'); }
   else if(q.soft) { cls='warn'; mark='△'; title=tr('warn'); }
   let html = '<div class="fb '+cls+'"><div class="head"><span class="mark">'+mark+'</span>'+title+'</div>';
+  /* 一眼先看到「错在哪一类」，再往下才是答案对照与整张表 */
+  if(q.diag) html += '<div class="hint" style="margin-top:5px">'+esc(q.diag)+'</div>';
   if(q.mode==='recognize'){
     const hits = q.hits || (q.hits = formHits(v, q.answer));
     const tp = uniq(hits.map(x=>x.p)).sort((a,b)=>a-b);      // 这个形式可能的人称
@@ -2113,12 +2870,14 @@ function showFeedback(q, review){
       why += tr('homoTail');
       html += '<div class="hint" style="margin-top:4px">'+why+'</div>';
     }
-    if(!q.correct && DB.settings.askTense && q.personOK && q.tenseOK === false)
+    if(!q.infOK)
+      html += '<div class="hint" style="margin-top:4px">'+tr('infWrong', esc(q.inf), esc(q.userAnswer||''))+'</div>';
+    if(!q.correct && q.askTense && q.personOK && q.tenseOK === false)
       html += '<div class="hint" style="margin-top:4px">'
            + tr('tenseWrong', personLabel(q.pickPerson, qTense(q)),
                 q.personTenses.length ? q.personTenses.map(k=>tName(k)).join(' / ') : tr('tenseWrongNoneP'),
                 tName(q.pickTense)) + '</div>';
-    if(q.pickPerson !== q.person || (DB.settings.askTense && q.pickTense && q.pickTense !== q.tense))
+    if(q.pickPerson !== q.person || (q.askTense && q.pickTense && q.pickTense !== q.tense))
       html += '<div class="hint" style="margin-top:4px">'
            + tr('cameFrom', esc(tName(q.tense)) + ' · ' + personLabel(q.person, qTense(q))) + '</div>';
     html += '<div class="hint" style="margin-top:6px">'+tr('gridLead')+'</div>';
@@ -3007,24 +3766,31 @@ function renderGuide(){
   const lk = (it.lk || []).map(l =>
       '<a href="'+esc(l.u)+'" target="_blank" rel="noopener"><b>'+esc(guideTxt(l.n))+'</b>'
       + '<span>'+esc(guideTxt(l.d))+'</span><em>'+esc(l.u)+'</em></a>').join('');
+  /* 页标题：把「① 入门：…」前面的序号单独拎出来做成圆标，
+     标题本身大一号 —— 翻页时第一眼就能分清"这是新的一页"。 */
+  const rawTitle = guideTxt(it.t);
+  const tm = rawTitle.match(/^\s*([①-⑳])\s*(.*)$/);
+  const titleHtml = tm
+    ? '<span class="gnum">'+esc(tm[1])+'</span>' + esc(tm[2])
+    : esc(rawTitle);
+  /* 页数指示与 8 页目录：都排成两列网格，和主页的入口排列保持一致 */
   $('gd-body').innerHTML =
-      '<div class="card"><div class="meta">'+esc(tr('gdCount', GUIDE_CUR+1, GUIDE.length))+'</div>'
-    + '<h2 style="margin:4px 0 12px">'+esc(guideTxt(it.t))+'</h2>'
+      '<div class="card">'
+    + '<div class="meta">'+esc(tr('gdCount', GUIDE_CUR+1, GUIDE.length))+'</div>'
+    + '<h2 style="margin:4px 0 14px">'+titleHtml+'</h2>'
     + '<div class="gd">'+expandGuide(guideBody(it))
     +   (lk ? '<h3>'+esc(tr('gdLinks'))+'</h3><div class="links">'+lk+'</div>' : '')
     + '</div>'
-    + '<div class="growbox">'+GUIDE.map((g,i)=>'<button type="button" class="chip sm" data-gi="'+i+'"'
+    + '<div class="gdgrid">'+GUIDE.map((g,i)=>'<button type="button" class="chip sm" data-gi="'+i+'"'
         + (i===GUIDE_CUR ? ' aria-pressed="true"' : '')+'>'+esc(guideTxt(g.s))+'</button>').join('')+'</div>'
     + '</div>';
   document.querySelectorAll('#gd-body [data-gi]').forEach(b=>{
     b.onclick = ()=>{ GUIDE_CUR = +b.dataset.gi; renderGuide(); };
   });
 }
-/* 主页「变位规则速览」卡片里的 8 个入口 */
+/* 主页「变位规则速览」卡片里的 8 个入口（整齐的两列） */
 function renderGuideHome(){
   $('h-guide').textContent = tr('hGuide');
-  $('m-guide-open').textContent = tr('guideOpen');
-  $('m-guide-hint').textContent = tr('guideHint');
   $('m-guide').innerHTML = GUIDE.map((g,i)=>
       '<button type="button" class="chip sm" data-gi="'+i+'">'+esc(guideTxt(g.s))+'</button>').join('');
   document.querySelectorAll('#m-guide [data-gi]').forEach(b=>{
@@ -3141,16 +3907,30 @@ function sugKey(e){
   if(e.key === 'Escape'){ hideSug(); return true; }
   return false;
 }
-/* ---- 抽屉的开合 ---- */
+/* ---- 抽屉（右栏）的开合 ----
+   现在有两个右栏：变位查询（#dw）与设置（#st）。两者共用一套外壳与动画，
+   开合逻辑也共用这里，只是各自记住自己的状态、各自切换 body 上的标记类。 */
 function setDrawer(on){
   DW_OPEN = !!on;
   const b = $('app-body'); if(b) b.classList.toggle('dw-open', DW_OPEN);
   const tab = $('dw-tab');  if(tab) tab.setAttribute('aria-expanded', DW_OPEN ? 'true' : 'false');
-  const dw  = $('dw');      if(dw)  dw.setAttribute('aria-hidden', DW_OPEN ? 'false' : 'true');
+  const dw  = $('dw');
+  if(dw){ dw.classList.toggle('on', DW_OPEN); dw.setAttribute('aria-hidden', DW_OPEN ? 'false' : 'true'); }
   if(!DW_OPEN) hideSug();
 }
 const toggleDrawer = () => setDrawer(!DW_OPEN);
 const closeDrawer  = () => setDrawer(false);
+/* 设置栏：同一套外壳，内容由 renderSettings() 生成 */
+function setSettings(on){
+  ST_OPEN = !!on;
+  const b = $('app-body'); if(b) b.classList.toggle('st-open', ST_OPEN);
+  const btn = $('m-set');  if(btn) btn.setAttribute('aria-expanded', ST_OPEN ? 'true' : 'false');
+  const st = $('st');
+  if(st){ st.classList.toggle('on', ST_OPEN); st.setAttribute('aria-hidden', ST_OPEN ? 'false' : 'true'); }
+  if(ST_OPEN) renderSettings();
+}
+const toggleSettings = () => setSettings(!ST_OPEN);
+const closeSettings  = () => setSettings(false);
 /* 打开右栏看变位表。hi = {t:时态键, p:人称下标} 时，把那一块高亮并滚到眼前 */
 function openTable(inf, hi){
   if(inf && byInf[inf]) DW_VERB = inf;
@@ -3222,6 +4002,7 @@ function show(id){
   ['scr-menu','scr-practice','scr-stats','scr-guide']
     .forEach(x=>$(x).classList.toggle('hidden', x!==id));
   closeDrawer();                       /* 右栏是浮层：换屏时一并收起 */
+  closeSettings();
   window.scrollTo(0,0);
 }
 function openGuide(k, back){
@@ -3232,33 +4013,43 @@ function openGuide(k, back){
   renderGuide();
   show('scr-guide');
 }
-$('m-start').onclick = ()=>{
-  SESS = {history:[], cur:-1, right:0, done:0, recent:[]};
-  const q = makeQuestion();
-  if(!q){ alert(tr('emptyPoolAlert')); return; }
-  SESS.history.push(q); SESS.cur = 0;
-  show('scr-practice'); renderPractice();
-};
+$('m-start').onclick = ()=>{ startPractice(); };
 $('m-stats-btn').onclick = ()=>{ renderStats(); show('scr-stats'); };
 $('p-exit').onclick = ()=>{
   if(SESS.done && !confirm(tr('endConfirm', SESS.done, Math.round(SESS.right/SESS.done*100)))) return;
   renderMenu(); show('scr-menu');
 };
 $('p-prev').onclick = ()=>{ if(SESS.cur>0){ SESS.cur--; renderPractice(); } };
-/* 中文释义开关：只把那一行改成「隐形」，不重绘整屏。
-   重绘会连带清掉已经敲进去的答案、并把「看原形」揭开的原形重新盖回去，
-   而且整屏重建时高度会跳一下（现在释义行固定占位，所以就地切换即可）。 */
-$('p-zh').onclick = ()=>{
-  DB.settings.showZh = !DB.settings.showZh; saveDB();
-  const on = DB.settings.showZh;
-  const line = document.querySelector('#p-body .qbox .zh-line');
-  if(line) line.classList.toggle('off', !on);
-  $('p-zh').textContent = on ? tr('zhOn') : tr('zhOff');
-  $('p-zh').style.color = on ? 'var(--accent)' : '';
-};
 $('s-back').onclick = ()=>{ renderMenu(); show('scr-menu'); };
-/* 右栏变位表：拉手 / 关闭 / 遮罩 / 查询框 */
-$('dw-tab').onclick = ()=>{ if(DW_OPEN) closeDrawer(); else openTable(DW_VERB); };
+/* 页面顶部的「设置」按钮 → 右侧设置栏（只放全局项：隐藏原形 / 含 vosotros） */
+$('m-set').onclick = ()=>{ if(ST_OPEN) closeSettings(); else setSettings(true); };
+/* ---- 自定义编辑模态：应用 / 恢复默认 / 关闭（✕、点遮罩、Esc） ---- */
+$('cm-apply').onclick = ()=>{
+  if(!CM_OPEN) return;
+  const k = CM_KEY;
+  closeCustomModal();
+  if(k) selectKey(k);                       /* 顺带给一句「已切到…」的回执 */
+  showToast('✅ ' + tr('savedOk'));
+};
+$('cm-reset').onclick = ()=>{
+  if(!CM_KEY) return;
+  DB.custom[CM_KEY] = defaultCustom();      /* 恢复成 A2 预填充 */
+  loadCustom(CM_KEY);
+  saveDB();
+  renderMenu();                             /* CM_OPEN 仍为 true：面板重画进模态 */
+};
+$('cm-close').onclick = closeCustomModal;
+$('cm-mask').onclick = closeCustomModal;
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && CM_OPEN) closeCustomModal();
+});
+$('st-close').onclick = closeSettings;
+/* 右栏变位查询：开始菜单里的入口 / 练习页的按钮 / 关闭 */
+$('dw-tab').onclick = ()=>{
+  if(DW_OPEN){ closeDrawer(); return; }
+  closeSettings();                  /* 两个右栏不同时开，免得叠在一起 */
+  openTable(DW_VERB);
+};
 $('dw-close').onclick = closeDrawer;
 $('dw-scrim').onclick = closeDrawer;
 /* 遮罩挡住背后页面的滚动（但不锁 body 的 overflow，免得滚动条忽隐忽现把正文挤一下） */
@@ -3272,9 +4063,9 @@ $('dw-q').onblur = ()=>{ setTimeout(hideSug, 160); };
 /* 做题途中也能随手拉开右栏看当前动词的变位 */
 $('p-table').onclick = ()=>{
   const q = SESS.history[SESS.cur];
+  closeSettings();
   openTable(q ? q.inf : DW_VERB, q ? {t:(q.mode==='shift'? q.tense2 : q.tense), p:q.person} : null);
 };
-$('m-guide-open').onclick = ()=> openGuide(GUIDE[GUIDE_CUR] ? GUIDE[GUIDE_CUR].k : 'basics', 'scr-menu');
 $('gd-back').onclick = ()=>{ show(GUIDE_BACK === 'scr-guide' ? 'scr-menu' : GUIDE_BACK); };
 
 loadDB();

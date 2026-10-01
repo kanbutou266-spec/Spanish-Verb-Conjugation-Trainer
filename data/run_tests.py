@@ -54,6 +54,21 @@ def run(cmd, **kw):
                           errors="replace", **kw)
 
 
+def run_headless_log(node, page):
+    """用 Playwright Chromium 跑测试页，返回 body[data-log] 字符串（失败返回 None）。
+    背景：本机 Edge 自动升级到 154 后 --headless/--dump-dom 静默失效（连 about:blank
+    都是 0 字节输出），故交互测试改走 playwright 自带的 chromium headless shell，
+    版本固定在 ms-playwright 缓存里，不再受系统浏览器升级影响。"""
+    runner = os.path.join(ROOT, "run_headless.js")
+    r = run([node, runner, page, "log"], cwd=ROOT, timeout=240)
+    out = (r.stdout or "").strip()
+    if r.returncode == 0 and out and not out.startswith("ERR"):
+        return out
+    if out:
+        print(out[:1500])
+    return None
+
+
 def main():
     skip_build = "--skip-build" in sys.argv
 
@@ -100,32 +115,12 @@ def main():
     print("\n".join(tail) or "(无输出)")
     smoke_ok = r.returncode == 0 and "失败 0" in r.stdout
 
-    print("\n== 交互回归测试 (无头 Edge) ==")
-    edge = find_edge()
-    if not edge:
-        print("找不到 Edge / Chrome，跳过交互测试")
-        return 0 if smoke_ok else 1
+    print("\n== 交互回归测试 (无头浏览器) ==")
     page = os.path.join(OUT, "tense.html")
-    dump = os.path.join(OUT, "_dom.html")
-    url = "file:///" + page.replace("\\", "/")
-    with io.open(dump, "w", encoding="utf-8") as fh:
-        # 显式给一个桌面宽度：无头默认 800x600 会触发 .tgs 的 780px 单列断点，
-        # 导致 2×2 网格 / 列宽 / 头部不换行等布局断言失去意义。
-        # 宽度要大于 1020px，右栏变位表才会走「把正文推左」的宽屏分支。
-        subprocess.run([edge, "--headless=new", "--disable-gpu", "--no-sandbox",
-                        "--window-size=1280,1400",
-                        "--virtual-time-budget=25000", "--dump-dom", url],
-                       stdout=fh, stderr=subprocess.DEVNULL, cwd=APPDIR, timeout=180)
-    html = io.open(dump, encoding="utf-8", errors="replace").read()
-    m = re.search(r'data-log="(.*?)"', html, re.S)
-    if not m:
-        # 没拿到日志：多半是脚本抛错。测试脚本会把异常写进 <title>，一并打印出来。
-        t = re.search(r"<title>(.*?)</title>", html, re.S)
+    log = run_headless_log(node, page)
+    if log is None:
         print("没拿到测试日志（页面可能没跑完）")
-        if t and "ERR" in t.group(1):
-            print("页面报错: " + t.group(1)[:1500])
         return 1
-    log = m.group(1)
     if log.startswith("ERR"):
         print(log[:1500]); return 1
     items = [x.strip() for x in log.split("~")]
